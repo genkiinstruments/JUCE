@@ -104,12 +104,20 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
         auto button = [statusItem.get() button];
         button.image = statusIcon.get();
         button.target = eventForwarder.get();
-        button.action = @selector (handleEvent:);
+
        #if defined (MAC_OS_X_VERSION_10_12) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_12
-        [button sendActionOn: NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown | NSEventMaskScrollWheel];
+        [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown)
        #else
-        [button sendActionOn: NSLeftMouseDownMask | NSRightMouseDownMask | NSScrollWheelMask];
+        [NSEvent addLocalMonitorForEventsMatchingMask:(NSLeftMouseDown | NSRightMouseDown)
        #endif
+                                              handler:^NSEvent *(NSEvent *event) {
+                                                  if (event.window == button.window) {
+                                                      handleEvent();
+                                                      return nil;
+                                                  }
+
+                                                  return event;
+                                              }];
     }
 
     void configureIcon() override
