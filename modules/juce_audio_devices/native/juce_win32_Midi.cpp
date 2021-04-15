@@ -26,7 +26,9 @@
  #define DRV_QUERYDEVICEINTERFACESIZE (DRV_RESERVED + 13)
 #endif
 
+#if INCLUDE_TE_VIRTUAL_MIDI
 #include "teVirtualMIDI.h"
+#endif
 
 namespace juce
 {
@@ -1981,6 +1983,7 @@ void MidiOutput::sendMessageNow (const MidiMessage& message)
     internal->sendMessageNow (message);
 }
 
+#if INCLUDE_TE_VIRTUAL_MIDI
 //======================================================================================================================
 struct Win32VirtualMidi
 {
@@ -2134,5 +2137,6 @@ std::unique_ptr<MidiInput> MidiInput::createNewDevice(const String& deviceName, 
 
     return midiInput;
 }
+#endif // INCLUDE_TE_VIRTUAL_MIDI
 
 } // namespace juce
