@@ -26,6 +26,8 @@
  #define DRV_QUERYDEVICEINTERFACESIZE (DRV_RESERVED + 13)
 #endif
 
+#include "teVirtualMIDI.h"
+
 namespace juce
 {
 
@@ -1977,6 +1979,160 @@ MidiOutput::~MidiOutput()
 void MidiOutput::sendMessageNow (const MidiMessage& message)
 {
     internal->sendMessageNow (message);
+}
+
+//======================================================================================================================
+struct Win32VirtualMidi
+{
+    using CallbackType = std::function<void(const uint8_t*, size_t)>;
+
+    static constexpr auto MaxSysExLength = 0xFFFF;
+
+    explicit Win32VirtualMidi(const String& name)
+            : deviceName(name),
+              teMidiPort(virtualMIDICreatePortEx2(deviceName.toWideCharPointer(), vmCallback, (DWORD_PTR) this, MaxSysExLength, TE_VM_FLAGS_PARSE_RX))
+    {
+        DBG("Create virtual MIDI port: " << deviceName);
+
+        if (teMidiPort == nullptr)
+            DBG("Failed to create virtual midi port");
+    }
+
+    ~Win32VirtualMidi()
+    {
+        DBG("Shut down virtual MIDI port: " << deviceName);
+
+        if (teMidiPort != nullptr)
+            virtualMIDIClosePort(teMidiPort);
+    }
+
+    void transmit(const uint8_t* bytes, size_t length) const
+    {
+        virtualMIDISendData(teMidiPort, (LPBYTE) bytes, static_cast<size_t>(length));
+    }
+
+    void startRx(CallbackType cb) { callback = std::move(cb); }
+
+    void stopRx() { callback = {}; }
+
+    void startTx() { started = true; }
+
+    void stopTx() { started = false; }
+
+    [[nodiscard]] bool isOutputConnected() const { return started; }
+
+    [[nodiscard]] bool isInputConnected() const { return callback != nullptr; }
+
+    [[nodiscard]] bool isBeingUsed() const { return isInputConnected() || isOutputConnected(); }
+
+    [[nodiscard]] const String& getName() const { return deviceName; }
+
+private:
+    static void CALLBACK vmCallback(LPVM_MIDI_PORT, LPBYTE midiDataBytes, DWORD length, DWORD_PTR dwCallbackInstance)
+    {
+        if (const auto* inst = reinterpret_cast<const Win32VirtualMidi*>(dwCallbackInstance); inst != nullptr && inst->callback != nullptr)
+            inst->callback(midiDataBytes, length);
+    }
+
+    const String deviceName;
+
+    LPVM_MIDI_PORT teMidiPort;
+
+    CallbackType callback = nullptr;
+
+    bool started = false;
+};
+
+static std::map<String, Win32VirtualMidi> virtualMidiPorts;
+
+Win32VirtualMidi& getOrCreatePort(const String& name)
+{
+    const auto[it, was_inserted] = virtualMidiPorts.emplace(name, name);
+
+    DBG("getOrCreatePort() " << name << ", was created? " << (was_inserted ? "yes" : "no"));
+
+    ignoreUnused(was_inserted);
+
+    return it->second;
+}
+
+//======================================================================================================================
+struct Win32VirtualMidiOutput : public MidiOutput::Pimpl
+{
+    explicit Win32VirtualMidiOutput(const MidiOutput& out)
+            : output(out),
+              port(getOrCreatePort(out.getName()))
+    {
+        port.startTx();
+    }
+
+    ~Win32VirtualMidiOutput() override
+    {
+        port.stopTx();
+    }
+
+    String getDeviceIdentifier() override { return output.getIdentifier(); }
+    String getDeviceName() override { return output.getName(); }
+
+    void sendMessageNow(const MidiMessage& msg) override
+    {
+        port.transmit(msg.getRawData(), msg.getRawDataSize());
+    }
+
+    const MidiOutput& output;
+    Win32VirtualMidi& port;
+};
+
+std::unique_ptr<MidiOutput> MidiOutput::createNewDevice(const String& deviceName)
+{
+    std::unique_ptr<MidiOutput> midiOutput(new MidiOutput(deviceName, String()));
+    midiOutput->internal = std::make_unique<Win32VirtualMidiOutput>(*midiOutput);
+
+    return midiOutput;
+}
+
+//======================================================================================================================
+struct Win32VirtualMidiInput : public MidiInput::Pimpl
+{
+    Win32VirtualMidiInput(MidiInput& inp, MidiInputCallback* cb)
+            : input(inp),
+              callback(cb),
+              port(getOrCreatePort(inp.getName()))
+    {
+        DBG("Create virtual MIDI input: " << getDeviceName());
+
+        port.startRx([this](const uint8_t* bytes, size_t length)
+        {
+            DBG("handleMidiData " << length);
+
+            callback->handleIncomingMidiMessage(&input, juce::MidiMessage(bytes, length));
+        });
+    }
+
+    ~Win32VirtualMidiInput() override
+    {
+        port.stopRx();
+    }
+
+    String getDeviceIdentifier() override { return input.getIdentifier(); }
+    String getDeviceName() override { return input.getName(); }
+
+    void start() override { }
+
+    void stop() override { }
+
+    MidiInput        & input;
+    MidiInputCallback* callback;
+
+    Win32VirtualMidi& port;
+};
+
+std::unique_ptr<MidiInput> MidiInput::createNewDevice(const String& deviceName, MidiInputCallback* callback)
+{
+    std::unique_ptr<MidiInput> midiInput(new MidiInput(deviceName, String()));
+    midiInput->internal = std::make_unique<Win32VirtualMidiInput>(*midiInput, callback);
+
+    return midiInput;
 }
 
 } // namespace juce
