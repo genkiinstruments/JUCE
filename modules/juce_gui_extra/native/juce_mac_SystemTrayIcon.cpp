@@ -111,7 +111,10 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
         const auto mask = NSLeftMouseDown | NSRightMouseDown;
        #endif
 
-        [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent *(NSEvent *event) { return handleEvent(event); }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent *(NSEvent *event)
+        {
+            return event.window == button.window ? handleEvent(event) : event;
+        }];
     }
 
     void configureIcon() override
