@@ -106,18 +106,12 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
         button.target = eventForwarder.get();
 
        #if defined (MAC_OS_X_VERSION_10_12) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_12
-        [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown)
+        const auto mask = NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown;
        #else
-        [NSEvent addLocalMonitorForEventsMatchingMask:(NSLeftMouseDown | NSRightMouseDown)
+        const auto mask = NSLeftMouseDown | NSRightMouseDown;
        #endif
-                                              handler:^NSEvent *(NSEvent *event) {
-                                                  if (event.window == button.window) {
-                                                      handleEvent();
-                                                      return nil;
-                                                  }
 
-                                                  return event;
-                                              }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent *(NSEvent *event) { return handleEvent(event); }];
     }
 
     void configureIcon() override
@@ -132,13 +126,16 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
     }
 
     //==============================================================================
-    void handleEvent()
+    NSEvent* handleEvent(NSEvent* event)
     {
-        auto e = [NSApp currentEvent];
-        NSEventType type = [e type];
+        NSEventType type = [event type];
 
-        const bool isLeft  = (type == NSEventTypeLeftMouseDown);
-        const bool isRight = (type == NSEventTypeRightMouseDown);
+        const bool isLeft    = (type == NSEventTypeLeftMouseDown);
+        const bool isRight   = (type == NSEventTypeRightMouseDown);
+
+        // Avoid overriding if the user wants to move the status bar icon around
+        if (([event modifierFlags] & NSCommandKeyMask) != 0)
+            return event;
 
         if (owner.isCurrentlyBlockedByAnotherModalComponent())
         {
@@ -150,38 +147,36 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
         {
             auto eventMods = ComponentPeer::getCurrentModifiersRealtime();
 
-            if (([e modifierFlags] & NSEventModifierFlagCommand) != 0)
-                eventMods = eventMods.withFlags (ModifierKeys::commandModifier);
-
             auto now = Time::getCurrentTime();
             auto mouseSource = Desktop::getInstance().getMainMouseSource();
-            auto pressure = (float) e.pressure;
 
             if (isLeft || isRight)
             {
                 owner.mouseDown ({ mouseSource, {},
                                    eventMods.withFlags (isLeft ? ModifierKeys::leftButtonModifier
                                                                : ModifierKeys::rightButtonModifier),
-                                   pressure,
+                                   event.pressure,
                                    MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
                                    MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
                                    &owner, &owner, now, {}, now, 1, false });
 
                 owner.mouseUp   ({ mouseSource, {},
                                    eventMods.withoutMouseButtons(),
-                                   pressure,
+                                   event.pressure,
                                    MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
                                    MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
                                    &owner, &owner, now, {}, now, 1, false });
             }
             else if (type == NSEventTypeMouseMoved)
             {
-                owner.mouseMove (MouseEvent (mouseSource, {}, eventMods, pressure,
+                owner.mouseMove (MouseEvent (mouseSource, {}, eventMods, event.pressure,
                                              MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
                                              MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
                                              &owner, &owner, now, {}, now, 1, false));
             }
         }
+
+        return nil;
     }
 
     //==============================================================================
@@ -204,7 +199,7 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
         static void handleEvent (id self, SEL, id)
         {
             if (auto* owner = getOwner (self))
-                owner->handleEvent();
+                owner->handleEvent([NSApp currentEvent]);
         }
     };
 
