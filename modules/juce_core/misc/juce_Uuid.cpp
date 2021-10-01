@@ -112,6 +112,11 @@ Uuid& Uuid::operator= (const String& uuidString)
     return *this;
 }
 
+Uuid::Uuid (std::string_view uuidString)
+{
+    operator= (String(uuidString.data()));
+}
+
 Uuid::Uuid (const uint8* const rawData) noexcept
 {
     operator= (rawData);

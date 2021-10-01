@@ -90,6 +90,7 @@ public:
     */
     Uuid& operator= (const String& uuidString);
 
+    Uuid (std::string_view);
 
     //==============================================================================
     /** Returns the time-low section of the UUID. */
