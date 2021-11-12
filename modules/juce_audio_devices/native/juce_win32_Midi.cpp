@@ -2046,10 +2046,13 @@ private:
     bool started = false;
 };
 
+static CriticalSection virtualMidiPortsLock;
 static std::map<String, Win32VirtualMidi> virtualMidiPorts;
 
 Win32VirtualMidi& getOrCreatePort(const String& name)
 {
+    const ScopedLock lock(virtualMidiPortsLock);
+
     const auto[it, was_inserted] = virtualMidiPorts.emplace(name, name);
 
     if (was_inserted)
@@ -2064,6 +2067,8 @@ Win32VirtualMidi& getOrCreatePort(const String& name)
 
 void releasePort(Win32VirtualMidi& port)
 {
+    const ScopedLock lock(virtualMidiPortsLock);
+    
     virtualMidiPorts.erase(virtualMidiPorts.find(port.getName()));
 }
 
