@@ -1209,7 +1209,7 @@ public:
     /** When loaded by a plugin wrapper, this flag will be set to indicate the type
         of plugin within which the processor is running.
     */
-    WrapperType wrapperType;
+    const WrapperType wrapperType;
 
     /** Returns a textual description of a WrapperType value */
     static const char* getWrapperTypeDescription (AudioProcessor::WrapperType) noexcept;
@@ -1483,15 +1483,20 @@ private:
 
     AudioProcessorParameter* getParamChecked (int) const;
 
-   #if JUCE_DEBUG
-    #if ! JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING
-     BigInteger changingParams;
-    #endif
+  #if JUCE_DEBUG
+   #if ! JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING
+    BigInteger changingParams;
+   #endif
 
     bool textRecursionCheck = false;
     std::unordered_set<String> paramIDs, groupIDs;
+   #if ! JUCE_DISABLE_CAUTIOUS_PARAMETER_ID_CHECKING
+    std::unordered_set<String> trimmedParamIDs;
    #endif
+  #endif
 
+    void checkForDuplicateTrimmedParamID (AudioProcessorParameter*);
+    void checkForUnsafeParamID (AudioProcessorParameter*);
     void checkForDuplicateParamID (AudioProcessorParameter*);
     void checkForDuplicateGroupIDs (const AudioProcessorParameterGroup&);
 

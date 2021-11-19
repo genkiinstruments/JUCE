@@ -174,7 +174,8 @@ struct GraphEditorPanel::PinComponent   : public Component,
 //==============================================================================
 struct GraphEditorPanel::PluginComponent   : public Component,
                                              public Timer,
-                                             private AudioProcessorParameter::Listener
+                                             private AudioProcessorParameter::Listener,
+                                             private AsyncUpdater
 {
     PluginComponent (GraphEditorPanel& p, AudioProcessorGraph::NodeID id)  : panel (p), graph (p.graph), pluginID (id)
     {
@@ -471,10 +472,14 @@ struct GraphEditorPanel::PluginComponent   : public Component,
 
     void parameterValueChanged (int, float) override
     {
-        repaint();
+        // Parameter changes might come from the audio thread or elsewhere, but
+        // we can only call repaint from the message thread.
+        triggerAsyncUpdate();
     }
 
     void parameterGestureChanged (int, bool) override  {}
+
+    void handleAsyncUpdate() override { repaint(); }
 
     GraphEditorPanel& panel;
     PluginGraph& graph;
@@ -1142,7 +1147,7 @@ struct GraphDocumentComponent::PluginListBoxModel    : public ListBoxModel,
 GraphDocumentComponent::GraphDocumentComponent (AudioPluginFormatManager& fm,
                                                 AudioDeviceManager& dm,
                                                 KnownPluginList& kpl)
-    : graph (new PluginGraph (fm)),
+    : graph (new PluginGraph (fm, kpl)),
       deviceManager (dm),
       pluginList (kpl),
       graphPlayer (getAppProperties().getUserSettings()->getBoolValue ("doublePrecisionProcessing", false))
@@ -1205,7 +1210,16 @@ GraphDocumentComponent::~GraphDocumentComponent()
 
 void GraphDocumentComponent::resized()
 {
-    auto r = getLocalBounds();
+    auto r = [this]
+    {
+        auto bounds = getLocalBounds();
+
+        if (auto* display = Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds()))
+            return display->safeAreaInsets.subtractedFrom (bounds);
+
+        return bounds;
+    }();
+
     const int titleBarHeight = 40;
     const int keysHeight = 60;
     const int statusHeight = 20;

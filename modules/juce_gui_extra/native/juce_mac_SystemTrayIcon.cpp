@@ -80,8 +80,8 @@ struct StatusItemContainer   : public Timer
     //==============================================================================
     SystemTrayIconComponent& owner;
 
-    std::unique_ptr<NSStatusItem, NSObjectDeleter> statusItem;
-    std::unique_ptr<NSImage, NSObjectDeleter> statusIcon;
+    NSUniquePtr<NSStatusItem> statusItem;
+    NSUniquePtr<NSImage> statusIcon;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StatusItemContainer)
 };
@@ -207,7 +207,7 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
     };
 
     //==============================================================================
-    std::unique_ptr<NSObject, NSObjectDeleter> eventForwarder;
+    NSUniquePtr<NSObject> eventForwarder;
 };
 
 //==============================================================================
@@ -374,7 +374,7 @@ struct ViewBasedStatusItem   : public StatusItemContainer
     };
 
     //==============================================================================
-    std::unique_ptr<NSControl, NSObjectDeleter> view;
+    NSUniquePtr<NSControl> view;
     bool isHighlighted = false;
 };
 

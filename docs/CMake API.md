@@ -2,9 +2,7 @@
 
 ## System Requirements
 
-- Console and GUI projects require CMake 3.12 or higher.
-- Plugin projects require CMake 3.15 or higher.
-- All iOS targets require CMake 3.14 or higher (3.15 or higher for plugins targeting iOS).
+- All project types require CMake 3.15 or higher.
 - Android targets are not currently supported.
 - WebView2 on Windows via JUCE_USE_WIN_WEBVIEW2 flag in juce_gui_extra is not currently supported.
 
@@ -137,6 +135,22 @@ Note that the static library produced by `juce_add_binary_data` automatically se
 Building universal binaries that will run on both arm64 and x86_64 can be achieved by
 configuring the CMake project with `"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"`.
 
+### Building with Clang on Windows
+
+Clang-cl (Clang with MSVC-like command-line) should work by default. If you are generating a Visual
+Studio project, and have installed the LLVM package which is distributed with Visual Studio, then
+you can configure a Clang-cl build by passing "-T ClangCL" on your configuration commandline.
+
+If you wish to use Clang with GNU-like command-line instead, you can pass
+`-DCMAKE_CXX_COMPILER=clang++` and `-DCMAKE_C_COMPILER=clang` on your configuration commandline.
+clang++ and clang must be on your `PATH` for this to work. Only more recent versions of CMake
+support Clang's GNU-like command-line on Windows. CMake 3.12 is not supported, CMake 3.15 has
+support, CMake 3.20 or higher is recommended.  Note that CMake doesn't seem to automatically link a
+runtime library when building in this configuration, but this can be remedied by setting the
+`MSVC_RUNTIME_LIBRARY` property. See the [official
+documentation](https://cmake.org/cmake/help/v3.15/prop_tgt/MSVC_RUNTIME_LIBRARY.html) of this
+property for usage recommendations.
+
 ### A note about compile definitions
 
 Module options and plugin options that would previously have been set in the Projucer can be set on
@@ -192,6 +206,13 @@ might slow down configuration a bit. If you enable this, you should probably als
 `set_property(GLOBAL PROPERTY USE_FOLDERS YES)` to your top level CMakeLists as this is required for
 source grouping to work.
 
+Source groupings are a little sensitive to the project layout. As such, you should always ensure
+that the call to `juce_add_module` which adds a specific module happens *before* calling
+`juce_add_*` to add any dependent targets.
+
+The modules will be placed in a group named "JUCE Modules" within the group for each target,
+alongside the "Source Files" and "Header Files" groups.
+
 #### `JUCE_COPY_PLUGIN_AFTER_BUILD`
 
 Controls whether plugin targets should be installed to the system after building. Note that the
@@ -228,7 +249,15 @@ attributes directly to these creation functions, rather than adding them later.
 
 - `VERSION`
   - A version number string in the format "major.minor.bugfix". If not specified, the `VERSION` of
-    the project containing the target will be used instead.
+    the project containing the target will be used instead. On Apple platforms, this is the
+    user-facing version string. This option corresponds to the `CFBundleShortVersionString` field in
+    the target's plist.
+
+- `BUILD_VERSION`
+  - A version number string in the format "major.minor.bugfix". If not specified, this will match
+    the `VERSION` of the target. On Apple platforms, this is the private version string used to
+    distinguish between App Store builds. This option corresponds to the `CFBundleVersion` field in
+    the target's plist.
 
 - `BUNDLE_ID`
   - An identifier string in the form "com.yourcompany.productname" which should uniquely identify
@@ -267,7 +296,7 @@ attributes directly to these creation functions, rather than adding them later.
 
 - `STATUS_BAR_HIDDEN`
   - May be either TRUE or FALSE. Adds the appropriate entries to an iOS app's Info.plist.
-  
+
  - `REQUIRES_FULL_SCREEN`
    - May be either TRUE or FALSE. Adds the appropriate entries to an iOS app's Info.plist.
 
@@ -589,14 +618,33 @@ disabled by setting the compile definitions `DONT_SET_USING_JUCE_NAMESPACE` and
 JuceHeader.h is optional. Instead, module headers can be included directly in source files that
 require them.
 
+#### `juce_enable_copy_plugin_step`
+
+    juce_enable_copy_plugin_step(<target>)
+
+As an alternative to the JUCE_COPY_PLUGIN_AFTER_BUILD property, you may call this function to
+manually enable post-build copy on a plugin. The argument to this function should be a target
+previously created with `juce_add_plugin`.
+
+JUCE_COPY_PLUGIN_AFTER_BUILD will cause plugins to be installed immediately after building. This is
+not always appropriate, if extra build steps (such as signing or modifying the plugin bundle) must
+be executed before the install. In such cases, you should leave JUCE_COPY_PLUGIN_AFTER_BUILD
+disabled, use `add_custom_command(TARGET POST_BUILD)` to add your own post-build steps, and then
+finally call `juce_enable_copy_plugin_step`.
+
+If your custom build steps need to use the location of the plugin artefact, you can extract this
+by querying the property `JUCE_PLUGIN_ARTEFACT_FILE` on a plugin target (*not* the shared code
+target!).
+
 #### `juce_set_<kind>_sdk_path`
 
     juce_set_aax_sdk_path(<absolute path>)
     juce_set_vst2_sdk_path(<absolute path>)
+    juce_set_vst3_sdk_path(<absolute path>)
 
-Call these functions from your CMakeLists to set up your local AAX and/or VST2 SDKs. These functions
-should be called *before* adding any targets that may depend on the AAX/VST2 SDKs (plugin
-hosts, VST2/AAX plugins etc.).
+Call these functions from your CMakeLists to set up your local AAX, VST2, and VST3 SDKs. These
+functions should be called *before* adding any targets that may depend on the AAX/VST2/VST3 SDKs
+(plugin hosts, AAX/VST2/VST3 plugins etc.).
 
 #### `juce_add_module`
 
