@@ -2046,17 +2046,30 @@ private:
     bool started = false;
 };
 
+static CriticalSection virtualMidiPortsLock;
 static std::map<String, Win32VirtualMidi> virtualMidiPorts;
 
 Win32VirtualMidi& getOrCreatePort(const String& name)
 {
+    const ScopedLock lock(virtualMidiPortsLock);
+
     const auto[it, was_inserted] = virtualMidiPorts.emplace(name, name);
 
-    DBG("getOrCreatePort() " << name << ", was created? " << (was_inserted ? "yes" : "no"));
-
-    ignoreUnused(was_inserted);
+    if (was_inserted)
+    {
+        // It seems to be more reliable to wait a few ms before using the port after creating it.
+        // Otherwise, the JUCE MIDI enumeration doesn't always pick up the ports
+        Thread::sleep(20);
+    }
 
     return it->second;
+}
+
+void releasePort(Win32VirtualMidi& port)
+{
+    const ScopedLock lock(virtualMidiPortsLock);
+    
+    virtualMidiPorts.erase(virtualMidiPorts.find(port.getName()));
 }
 
 //======================================================================================================================
@@ -2066,12 +2079,17 @@ struct Win32VirtualMidiOutput : public MidiOutput::Pimpl
             : output(out),
               port(getOrCreatePort(out.getName()))
     {
+        DBG("Create virtual MIDI output: " << getDeviceName());
+
         port.startTx();
     }
 
     ~Win32VirtualMidiOutput() override
     {
         port.stopTx();
+
+        if (!port.isBeingUsed())
+            releasePort(port);
     }
 
     String getDeviceIdentifier() override { return output.getIdentifier(); }
@@ -2106,8 +2124,6 @@ struct Win32VirtualMidiInput : public MidiInput::Pimpl
 
         port.startRx([this](const uint8_t* bytes, size_t length)
         {
-            DBG("handleMidiData " << length);
-
             callback->handleIncomingMidiMessage(&input, juce::MidiMessage(bytes, length));
         });
     }
@@ -2115,6 +2131,9 @@ struct Win32VirtualMidiInput : public MidiInput::Pimpl
     ~Win32VirtualMidiInput() override
     {
         port.stopRx();
+
+        if (!port.isBeingUsed())
+            releasePort(port);
     }
 
     String getDeviceIdentifier() override { return input.getIdentifier(); }
