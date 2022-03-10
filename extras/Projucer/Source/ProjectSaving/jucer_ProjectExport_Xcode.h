@@ -74,6 +74,10 @@ public:
           appSandboxValue                              (settings, Ids::appSandbox,                              getUndoManager()),
           appSandboxInheritanceValue                   (settings, Ids::appSandboxInheritance,                   getUndoManager()),
           appSandboxOptionsValue                       (settings, Ids::appSandboxOptions,                       getUndoManager(), Array<var>(), ","),
+          appSandboxHomeDirROValue                     (settings, Ids::appSandboxHomeDirRO,                     getUndoManager()),
+          appSandboxHomeDirRWValue                     (settings, Ids::appSandboxHomeDirRW,                     getUndoManager()),
+          appSandboxAbsDirROValue                      (settings, Ids::appSandboxAbsDirRO,                      getUndoManager()),
+          appSandboxAbsDirRWValue                      (settings, Ids::appSandboxAbsDirRW,                      getUndoManager()),
           hardenedRuntimeValue                         (settings, Ids::hardenedRuntime,                         getUndoManager()),
           hardenedRuntimeOptionsValue                  (settings, Ids::hardenedRuntimeOptions,                  getUndoManager(), Array<var>(), ","),
           microphonePermissionNeededValue              (settings, Ids::microphonePermissionNeeded,              getUndoManager()),
@@ -100,6 +104,7 @@ public:
           iosPushNotificationsValue                    (settings, Ids::iosPushNotifications,                    getUndoManager()),
           iosAppGroupsValue                            (settings, Ids::iosAppGroups,                            getUndoManager()),
           iCloudPermissionsValue                       (settings, Ids::iCloudPermissions,                       getUndoManager()),
+          networkingMulticastValue                     (settings, Ids::networkingMulticast,                     getUndoManager()),
           iosDevelopmentTeamIDValue                    (settings, Ids::iosDevelopmentTeamID,                    getUndoManager()),
           iosAppGroupsIDValue                          (settings, Ids::iosAppGroupsId,                          getUndoManager()),
           keepCustomXcodeSchemesValue                  (settings, Ids::keepCustomXcodeSchemes,                  getUndoManager()),
@@ -172,6 +177,21 @@ public:
     bool isAppSandboxInhertianceEnabled() const             { return appSandboxInheritanceValue.get(); }
     Array<var> getAppSandboxOptions() const                 { return *appSandboxOptionsValue.get().getArray(); }
 
+    auto getAppSandboxTemporaryPaths() const
+    {
+        std::vector<build_tools::EntitlementOptions::KeyAndStringArray> result;
+
+        for (const auto& entry : sandboxFileAccessProperties)
+        {
+            auto paths = getCommaOrWhitespaceSeparatedItems (entry.property.get());
+
+            if (! paths.isEmpty())
+                result.push_back ({ "com.apple.security.temporary-exception.files." + entry.key, std::move (paths) });
+        }
+
+        return result;
+    }
+
     Array<var> getValidArchs() const                        { return *validArchsValue.get().getArray(); }
 
     bool isMicrophonePermissionEnabled() const              { return microphonePermissionNeededValue.get(); }
@@ -193,6 +213,7 @@ public:
     bool isPushNotificationsEnabled() const                 { return iosPushNotificationsValue.get(); }
     bool isAppGroupsEnabled() const                         { return iosAppGroupsValue.get(); }
     bool isiCloudPermissionsEnabled() const                 { return iCloudPermissionsValue.get(); }
+    bool isNetworkingMulticastEnabled() const               { return networkingMulticastValue.get(); }
     bool isFileSharingEnabled() const                       { return uiFileSharingEnabledValue.get(); }
     bool isDocumentBrowserEnabled() const                   { return uiSupportsDocumentBrowserValue.get(); }
     bool isStatusBarHidden() const                          { return uiStatusBarHiddenValue.get(); }
@@ -357,7 +378,7 @@ public:
                 { "Developer Tools",      "developer-tools" },
                 { "Education",            "education" },
                 { "Entertainment",        "entertainment" },
-                { "Finace",               "finance" },
+                { "Finance",              "finance" },
                 { "Games",                "games" },
                 { "Games - Action",       "action-games" },
                 { "Games - Adventure",    "adventure-games" },
@@ -455,29 +476,36 @@ public:
                 { "Temporary Exception: Audio Unit Hosting",                       "temporary-exception.audio-unit-host" },
                 { "Temporary Exception: Global Mach Service",                      "temporary-exception.mach-lookup.global-name" },
                 { "Temporary Exception: Global Mach Service Dynamic Registration", "temporary-exception.mach-register.global-name" },
-                { "Temporary Exception: Home Directory File Access (Read Only)",   "temporary-exception.files.home-relative-path.read-only" },
-                { "Temporary Exception: Home Directory File Access (Read/Write)",  "temporary-exception.files.home-relative-path.read-write" },
-                { "Temporary Exception: Absolute Path File Access (Read Only)",    "temporary-exception.files.absolute-path.read-only" },
-                { "Temporary Exception: Absolute Path File Access (Read/Write)",   "temporary-exception.files.absolute-path.read-write" },
                 { "Temporary Exception: IOKit User Client Class",                  "temporary-exception.iokit-user-client-class" },
                 { "Temporary Exception: Shared Preference Domain (Read Only)",     "temporary-exception.shared-preference.read-only" },
                 { "Temporary Exception: Shared Preference Domain (Read/Write)",    "temporary-exception.shared-preference.read-write" }
             };
 
             StringArray sandboxKeys;
-            Array<var> sanboxValues;
+            Array<var> sandboxValues;
 
             for (auto& opt : sandboxOptions)
             {
                 sandboxKeys.add (opt.first);
-                sanboxValues.add ("com.apple.security." + opt.second);
+                sandboxValues.add ("com.apple.security." + opt.second);
             }
 
             props.add (new MultiChoicePropertyComponentWithEnablement (appSandboxOptionsValue,
                                                                        appSandboxValue,
                                                                        "App Sandbox Options",
                                                                        sandboxKeys,
-                                                                       sanboxValues));
+                                                                       sandboxValues));
+
+            for (const auto& entry : sandboxFileAccessProperties)
+            {
+                props.add (new TextPropertyComponentWithEnablement (entry.property,
+                                                                    appSandboxValue,
+                                                                    entry.label,
+                                                                    8192,
+                                                                    true),
+                           "A list of the corresponding paths (separated by newlines or whitespace). "
+                           "See Apple's File Access Temporary Exceptions documentation.");
+            }
 
             props.add (new ChoicePropertyComponent (hardenedRuntimeValue, "Use Hardened Runtime"),
                        "Enable this to use the hardened runtime required for app notarization.");
@@ -572,7 +600,12 @@ public:
 
             props.add (new ChoicePropertyComponent (iCloudPermissionsValue, "iCloud Permissions"),
                        "Enable this to grant your app the capability to use native file load/save browser windows on iOS.");
+
         }
+
+        props.add (new ChoicePropertyComponent (networkingMulticastValue, "Networking Multicast Capability"),
+                   "Your app must have this entitlement to send or receive IP multicast or broadcast. "
+                   "You will also need permission from Apple to use this entitlement.");
 
         props.add (new ChoicePropertyComponent (iosPushNotificationsValue, "Push Notifications Capability"),
                    "Enable this to grant your app the capability to receive push notifications.");
@@ -875,11 +908,11 @@ protected:
         //==============================================================================
         bool iOS;
 
-        ValueWithDefault macOSBaseSDK, macOSDeploymentTarget, macOSArchitecture, iosBaseSDK, iosDeploymentTarget,
-                         customXcodeFlags, plistPreprocessorDefinitions, codeSignIdentity,
-                         fastMathEnabled, stripLocalSymbolsEnabled, pluginBinaryCopyStepEnabled,
-                         vstBinaryLocation, vst3BinaryLocation, auBinaryLocation, rtasBinaryLocation,
-                         aaxBinaryLocation, unityPluginBinaryLocation;
+        ValueTreePropertyWithDefault macOSBaseSDK, macOSDeploymentTarget, macOSArchitecture, iosBaseSDK, iosDeploymentTarget,
+                                     customXcodeFlags, plistPreprocessorDefinitions, codeSignIdentity,
+                                     fastMathEnabled, stripLocalSymbolsEnabled, pluginBinaryCopyStepEnabled,
+                                     vstBinaryLocation, vst3BinaryLocation, auBinaryLocation, rtasBinaryLocation,
+                                     aaxBinaryLocation, unityPluginBinaryLocation;
 
         //==============================================================================
         void valueTreePropertyChanged (ValueTree&, const Identifier& property) override
@@ -956,7 +989,9 @@ protected:
             if (macOSArchitecture.get() == "default")
                 macOSArchitecture.resetToDefault();
 
-            const auto updateSDKString = [this] (const Identifier& propertyName, ValueWithDefault& value, const String& suffix)
+            const auto updateSDKString = [this] (const Identifier& propertyName,
+                                                 ValueTreePropertyWithDefault& value,
+                                                 const String& suffix)
             {
                 auto sdkString = config[propertyName].toString();
 
@@ -1345,6 +1380,7 @@ public:
              || owner.isAppGroupsEnabled()
              || owner.isAppSandboxEnabled()
              || owner.isHardenedRuntimeEnabled()
+             || owner.isNetworkingMulticastEnabled()
              || (owner.isiOS() && owner.isiCloudPermissionsEnabled()))
                 return true;
 
@@ -1436,16 +1472,24 @@ public:
 
             if (! owner.isiOS())
             {
-                auto validArchs = owner.getValidArchs();
+                const auto validArchs = owner.getValidArchs();
 
                 if (! validArchs.isEmpty())
                 {
-                    const auto joined = std::accumulate (validArchs.begin(),
-                                                         validArchs.end(),
-                                                         String(),
-                                                         [] (String str, const var& v) { return str + v.toString() + " "; });
+                    const auto join = [] (const Array<var>& range)
+                    {
+                        return std::accumulate (range.begin(),
+                                                range.end(),
+                                                String(),
+                                                [] (String str, const var& v) { return str + v.toString() + " "; }).trim().quoted();
+                    };
 
-                    s.set ("VALID_ARCHS", joined.trim().quoted());
+                    s.set ("VALID_ARCHS", join (validArchs));
+
+                    auto excludedArchs = owner.getAllArchs();
+                    excludedArchs.removeIf ([&validArchs] (const auto& a) { return validArchs.contains (a); });
+
+                    s.set ("EXCLUDED_ARCHS", join (excludedArchs));
                 }
             }
 
@@ -1532,12 +1576,25 @@ public:
             if (config.isFastMathEnabled())
                 s.set ("GCC_FAST_MATH", "YES");
 
-            auto flags = (config.getRecommendedCompilerWarningFlags().joinIntoString (" ")
-                             + " " + owner.getExtraCompilerFlagsString()).trim();
-            flags = owner.replacePreprocessorTokens (config, flags);
+            auto recommendedWarnings = config.getRecommendedCompilerWarningFlags();
+            recommendedWarnings.cpp.addArray (recommendedWarnings.common);
 
-            if (flags.isNotEmpty())
-                s.set ("OTHER_CPLUSPLUSFLAGS", flags.quoted());
+            struct XcodeWarningFlags
+            {
+                const StringArray& flags;
+                const String variable;
+            };
+
+            for (const auto& xcodeFlags : { XcodeWarningFlags { recommendedWarnings.common, "OTHER_CFLAGS" },
+                                            XcodeWarningFlags { recommendedWarnings.cpp,    "OTHER_CPLUSPLUSFLAGS" } })
+            {
+                auto flags = (xcodeFlags.flags.joinIntoString (" ")
+                                 + " " + owner.getExtraCompilerFlagsString()).trim();
+                flags = owner.replacePreprocessorTokens (config, flags);
+
+                if (flags.isNotEmpty())
+                    s.set (xcodeFlags.variable, flags.quoted());
+            }
 
             auto installPath = getInstallPathForConfiguration (config);
 
@@ -1632,7 +1689,7 @@ public:
                 auto cppStandard = owner.project.getCppStandardString();
 
                 if (cppStandard == "latest")
-                    cppStandard = "17";
+                    cppStandard = owner.project.getLatestNumberedCppStandardString();
 
                 s.set ("CLANG_CXX_LANGUAGE_STANDARD", (String (owner.shouldUseGNUExtensions() ? "gnu++"
                                                                                               : "c++") + cppStandard).quoted());
@@ -1692,7 +1749,7 @@ public:
                 auto def = defines.getAllKeys()[i];
                 auto value = defines.getAllValues()[i];
                 if (value.isNotEmpty())
-                    def << "=" << value.replace ("\"", "\\\\\\\"").replace (" ", "\\\\ ");
+                    def << "=" << value.replace ("\"", "\\\\\\\"").replace (" ", "\\\\ ").replace ("\'", "\\\\'");
 
                 defsList.add ("\"" + def + "\"");
             }
@@ -2369,16 +2426,18 @@ private:
             {
                 mo.setNewLineString (getNewLineString());
 
-                mo << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"              << newLine
+                mo << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"                 << newLine
                    << "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">" << newLine
-                   << "<plist version=\"1.0\">"                                 << newLine
-                   << "<dict>"                                                  << newLine
-                   << "\t" << "<key>BuildSystemType</key>"                      << newLine
-                   << "\t" << "<string>Original</string>"                       << newLine
-                   << "\t" << "<key>DisableBuildSystemDeprecationWarning</key>" << newLine
-                   << "\t" << "<true/>"                                         << newLine
-                   << "</dict>"                                                 << newLine
-                   << "</plist>"                                                << newLine;
+                   << "<plist version=\"1.0\">"                                    << newLine
+                   << "<dict>"                                                     << newLine
+                   << "\t" << "<key>BuildSystemType</key>"                         << newLine
+                   << "\t" << "<string>Original</string>"                          << newLine
+                   << "\t" << "<key>DisableBuildSystemDeprecationWarning</key>"    << newLine
+                   << "\t" << "<true/>"                                            << newLine
+                   << "\t" << "<key>DisableBuildSystemDeprecationDiagnostic</key>" << newLine
+                   << "\t" << "<true/>"                                            << newLine
+                   << "</dict>"                                                    << newLine
+                   << "</plist>"                                                   << newLine;
             });
         }
         else
@@ -3048,9 +3107,11 @@ private:
         options.isHardenedRuntimeEnabled        = isHardenedRuntimeEnabled();
         options.isAppSandboxEnabled             = isAppSandboxEnabled();
         options.isAppSandboxInhertianceEnabled  = isAppSandboxInhertianceEnabled();
+        options.isNetworkingMulticastEnabled    = isNetworkingMulticastEnabled();
         options.appGroupIdString                = getAppGroupIdString();
         options.hardenedRuntimeOptions          = getHardenedRuntimeOptions();
         options.appSandboxOptions               = getAppSandboxOptions();
+        options.appSandboxTemporaryPaths        = getAppSandboxTemporaryPaths();
 
         const auto entitlementsFile = getTargetFolder().getChildFile (target.getEntitlementsFilename());
         build_tools::overwriteFileIfDifferentOrThrow (entitlementsFile, options.getEntitlementsFileContent());
@@ -3337,7 +3398,7 @@ private:
     {
         std::map<String, String> attributes;
 
-        attributes["LastUpgradeCheck"] = "1300";
+        attributes["LastUpgradeCheck"] = "1320";
         attributes["ORGANIZATIONNAME"] = getProject().getCompanyNameString().quoted();
 
         if (projectType.isGUIApplication() || projectType.isAudioPlugin())
@@ -3523,24 +3584,39 @@ private:
 
     const bool iOS;
 
-    ValueWithDefault applicationCategoryValue,
-                     customPListValue, pListPrefixHeaderValue, pListPreprocessValue,
-                     subprojectsValue,
-                     validArchsValue,
-                     extraFrameworksValue, frameworkSearchPathsValue, extraCustomFrameworksValue, embeddedFrameworksValue,
-                     postbuildCommandValue, prebuildCommandValue,
-                     duplicateAppExResourcesFolderValue, iosDeviceFamilyValue, iPhoneScreenOrientationValue,
-                     iPadScreenOrientationValue, customXcodeResourceFoldersValue, customXcassetsFolderValue,
-                     appSandboxValue, appSandboxInheritanceValue, appSandboxOptionsValue,
-                     hardenedRuntimeValue, hardenedRuntimeOptionsValue,
-                     microphonePermissionNeededValue, microphonePermissionsTextValue,
-                     cameraPermissionNeededValue, cameraPermissionTextValue,
-                     bluetoothPermissionNeededValue, bluetoothPermissionTextValue,
-                     sendAppleEventsPermissionNeededValue, sendAppleEventsPermissionTextValue,
-                     uiFileSharingEnabledValue, uiSupportsDocumentBrowserValue, uiStatusBarHiddenValue, uiRequiresFullScreenValue, documentExtensionsValue, iosInAppPurchasesValue,
-                     iosContentSharingValue, iosBackgroundAudioValue, iosBackgroundBleValue, iosPushNotificationsValue, iosAppGroupsValue, iCloudPermissionsValue,
-                     iosDevelopmentTeamIDValue, iosAppGroupsIDValue, keepCustomXcodeSchemesValue, useHeaderMapValue, customLaunchStoryboardValue,
-                     exporterBundleIdentifierValue, suppressPlistResourceUsageValue, useLegacyBuildSystemValue, buildNumber;
+    ValueTreePropertyWithDefault applicationCategoryValue,
+                                 customPListValue, pListPrefixHeaderValue, pListPreprocessValue,
+                                 subprojectsValue,
+                                 validArchsValue,
+                                 extraFrameworksValue, frameworkSearchPathsValue, extraCustomFrameworksValue, embeddedFrameworksValue,
+                                 postbuildCommandValue, prebuildCommandValue,
+                                 duplicateAppExResourcesFolderValue, iosDeviceFamilyValue, iPhoneScreenOrientationValue,
+                                 iPadScreenOrientationValue, customXcodeResourceFoldersValue, customXcassetsFolderValue,
+                                 appSandboxValue, appSandboxInheritanceValue, appSandboxOptionsValue,
+                                 appSandboxHomeDirROValue, appSandboxHomeDirRWValue, appSandboxAbsDirROValue, appSandboxAbsDirRWValue,
+                                 hardenedRuntimeValue, hardenedRuntimeOptionsValue,
+                                 microphonePermissionNeededValue, microphonePermissionsTextValue,
+                                 cameraPermissionNeededValue, cameraPermissionTextValue,
+                                 bluetoothPermissionNeededValue, bluetoothPermissionTextValue,
+                                 sendAppleEventsPermissionNeededValue, sendAppleEventsPermissionTextValue,
+                                 uiFileSharingEnabledValue, uiSupportsDocumentBrowserValue, uiStatusBarHiddenValue, uiRequiresFullScreenValue, documentExtensionsValue, iosInAppPurchasesValue,
+                                 iosContentSharingValue, iosBackgroundAudioValue, iosBackgroundBleValue, iosPushNotificationsValue, iosAppGroupsValue, iCloudPermissionsValue,
+                                 networkingMulticastValue, iosDevelopmentTeamIDValue, iosAppGroupsIDValue, keepCustomXcodeSchemesValue, useHeaderMapValue, customLaunchStoryboardValue,
+                                 exporterBundleIdentifierValue, suppressPlistResourceUsageValue, useLegacyBuildSystemValue, buildNumber;
+
+    struct SandboxFileAccessProperty
+    {
+        const ValueTreePropertyWithDefault& property;
+        const String label, key;
+    };
+
+    const std::vector<SandboxFileAccessProperty> sandboxFileAccessProperties
+    {
+        { appSandboxHomeDirROValue, "App sandbox temporary exception: home directory read only file access",  "home-relative-path.read-only" },
+        { appSandboxHomeDirRWValue, "App sandbox temporary exception: home directory read/write file access", "home-relative-path.read-write" },
+        { appSandboxAbsDirROValue,  "App sandbox temporary exception: absolute path read only file access",   "absolute-path.read-only" },
+        { appSandboxAbsDirRWValue,  "App sandbox temporary exception: absolute path read/write file access",  "absolute-path.read-write" }
+    };
 
     JUCE_DECLARE_NON_COPYABLE (XcodeProjectExporter)
 };

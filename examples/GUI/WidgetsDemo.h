@@ -47,7 +47,7 @@
 #pragma once
 
 #ifndef PIP_DEMO_UTILITIES_INCLUDED
- #include "../Assets/DemoUtilities.h"
+#include "../Assets/DemoUtilities.h"
 #endif
 
 //==============================================================================
@@ -571,7 +571,10 @@ struct MenuPage   : public Component
             struct CustomComponent  : public PopupMenu::CustomComponent
             {
                 CustomComponent (int widthIn, int heightIn, Colour backgroundIn)
-                    : idealWidth (widthIn), idealHeight (heightIn), background (backgroundIn)
+                    : PopupMenu::CustomComponent (false),
+                      idealWidth (widthIn),
+                      idealHeight (heightIn),
+                      background (backgroundIn)
                 {}
 
                 void getIdealSize (int& width, int& height) override

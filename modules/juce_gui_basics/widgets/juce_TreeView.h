@@ -363,6 +363,13 @@ public:
     /** Draws the line that extends vertically up towards one of its parents, or down to one of its children. */
     virtual void paintVerticalConnectingLine (Graphics&, const Line<float>& line);
 
+    /** This should return true if you want to use a custom component, and also use
+        the TreeView's built-in mouse handling support, enabling drag-and-drop,
+        itemClicked() and itemDoubleClicked(); return false if the component should
+        consume all mouse clicks.
+    */
+    virtual bool customComponentUsesTreeViewMouseHandler() const     { return false; }
+
     /** Called when the user clicks on this item.
 
         If you're using createItemComponent() to create a custom component for the
@@ -945,11 +952,6 @@ private:
     std::unique_ptr<TargetGroupHighlight> dragTargetGroupHighlight;
     int indentSize = -1;
     bool defaultOpenness = false, rootItemVisible = true, multiSelectEnabled = false, openCloseButtonsVisible = true;
-
-   #if JUCE_CATCH_DEPRECATED_CODE_MISUSE
-    // this method has been deprecated - see the new version..
-    virtual int paintOpenCloseButton (Graphics&, int, int, bool) { return 0; }
-   #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TreeView)
 };

@@ -162,8 +162,16 @@ namespace WindowsFileHelpers
 }
 
 //==============================================================================
-JUCE_DECLARE_DEPRECATED_STATIC (const juce_wchar File::separator = '\\';)
-JUCE_DECLARE_DEPRECATED_STATIC (const StringRef File::separatorString ("\\");)
+#if JUCE_ALLOW_STATIC_NULL_VARIABLES
+
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4996)
+
+const juce_wchar File::separator = '\\';
+const StringRef File::separatorString ("\\");
+
+JUCE_END_IGNORE_WARNINGS_MSVC
+
+#endif
 
 juce_wchar File::getSeparatorChar()    { return '\\'; }
 StringRef File::getSeparatorString()   { return "\\"; }
@@ -610,17 +618,18 @@ File JUCE_CALLTYPE File::getSpecialLocation (const SpecialLocationType type)
 
     switch (type)
     {
-        case userHomeDirectory:                 csidlType = CSIDL_PROFILE; break;
-        case userDocumentsDirectory:            csidlType = CSIDL_PERSONAL; break;
-        case userDesktopDirectory:              csidlType = CSIDL_DESKTOP; break;
-        case userApplicationDataDirectory:      csidlType = CSIDL_APPDATA; break;
-        case commonApplicationDataDirectory:    csidlType = CSIDL_COMMON_APPDATA; break;
-        case commonDocumentsDirectory:          csidlType = CSIDL_COMMON_DOCUMENTS; break;
-        case globalApplicationsDirectory:       csidlType = CSIDL_PROGRAM_FILES; break;
-        case globalApplicationsDirectoryX86:    csidlType = CSIDL_PROGRAM_FILESX86; break;
-        case userMusicDirectory:                csidlType = 0x0d; /*CSIDL_MYMUSIC*/ break;
-        case userMoviesDirectory:               csidlType = 0x0e; /*CSIDL_MYVIDEO*/ break;
-        case userPicturesDirectory:             csidlType = 0x27; /*CSIDL_MYPICTURES*/ break;
+        case userHomeDirectory:                 csidlType = CSIDL_PROFILE;              break;
+        case userDocumentsDirectory:            csidlType = CSIDL_PERSONAL;             break;
+        case userDesktopDirectory:              csidlType = CSIDL_DESKTOP;              break;
+        case userApplicationDataDirectory:      csidlType = CSIDL_APPDATA;              break;
+        case commonApplicationDataDirectory:    csidlType = CSIDL_COMMON_APPDATA;       break;
+        case commonDocumentsDirectory:          csidlType = CSIDL_COMMON_DOCUMENTS;     break;
+        case globalApplicationsDirectory:       csidlType = CSIDL_PROGRAM_FILES;        break;
+        case globalApplicationsDirectoryX86:    csidlType = CSIDL_PROGRAM_FILESX86;     break;
+        case windowsLocalAppData:               csidlType = CSIDL_LOCAL_APPDATA;        break;
+        case userMusicDirectory:                csidlType = 0x0d; /*CSIDL_MYMUSIC*/     break;
+        case userMoviesDirectory:               csidlType = 0x0e; /*CSIDL_MYVIDEO*/     break;
+        case userPicturesDirectory:             csidlType = 0x27; /*CSIDL_MYPICTURES*/  break;
 
         case tempDirectory:
         {
@@ -698,7 +707,8 @@ String File::getVersion() const
 //==============================================================================
 bool File::isSymbolicLink() const
 {
-    return (GetFileAttributes (fullPath.toWideCharPointer()) & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+    const auto attributes = WindowsFileHelpers::getAtts (fullPath);
+    return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0);
 }
 
 bool File::isShortcut() const

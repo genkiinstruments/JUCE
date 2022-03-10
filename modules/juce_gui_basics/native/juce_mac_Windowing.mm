@@ -43,7 +43,15 @@ public:
 
     int getResult() const
     {
-        switch (getRawResult())
+        return convertResult ([getAlert() runModal]);
+    }
+
+    using AsyncUpdater::triggerAsyncUpdate;
+
+private:
+    static int convertResult (NSModalResponse response)
+    {
+        switch (response)
         {
             case NSAlertFirstButtonReturn:   return 0;
             case NSAlertSecondButtonReturn:  return 1;
@@ -55,15 +63,37 @@ public:
         return 0;
     }
 
-    using AsyncUpdater::triggerAsyncUpdate;
-
-private:
     void handleAsyncUpdate() override
     {
-        auto result = getResult();
+        if (auto* comp = options.getAssociatedComponent())
+        {
+            if (auto* peer = comp->getPeer())
+            {
+                if (auto* view = static_cast<NSView*> (peer->getNativeHandle()))
+                {
+                    if (auto* window = [view window])
+                    {
+                        if (@available (macOS 10.9, *))
+                        {
+                            [getAlert() beginSheetModalForWindow: window completionHandler: ^(NSModalResponse result)
+                            {
+                                handleModalFinished (result);
+                            }];
 
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        handleModalFinished ([getAlert() runModal]);
+    }
+
+    void handleModalFinished (NSModalResponse result)
+    {
         if (callback != nullptr)
-            callback->modalStateFinished (result);
+            callback->modalStateFinished (convertResult (result));
 
         delete this;
     }
@@ -74,7 +104,7 @@ private:
             [alert addButtonWithTitle: juceStringToNS (button)];
     }
 
-    NSInteger getRawResult() const
+    NSAlert* getAlert() const
     {
         NSAlert* alert = [[[NSAlert alloc] init] autorelease];
 
@@ -82,7 +112,7 @@ private:
         [alert setInformativeText: juceStringToNS (options.getMessage())];
 
         [alert setAlertStyle: options.getIconType() == MessageBoxIconType::WarningIcon ? NSAlertStyleCritical
-                                                                                                : NSAlertStyleInformational];
+                                                                                       : NSAlertStyleInformational];
 
         const auto button1Text = options.getButtonText (0);
 
@@ -90,7 +120,7 @@ private:
         addButton (alert, options.getButtonText (1));
         addButton (alert, options.getButtonText (2));
 
-        return [alert runModal];
+        return alert;
     }
 
     MessageBoxOptions options;
@@ -125,13 +155,14 @@ static int showDialog (const MessageBoxOptions& options,
 #if JUCE_MODAL_LOOPS_PERMITTED
 void JUCE_CALLTYPE NativeMessageBox::showMessageBox (MessageBoxIconType iconType,
                                                      const String& title, const String& message,
-                                                     Component* /*associatedComponent*/)
+                                                     Component* associatedComponent)
 {
     showDialog (MessageBoxOptions()
                  .withIconType (iconType)
                  .withTitle (title)
                  .withMessage (message)
-                 .withButton (TRANS("OK")),
+                 .withButton (TRANS("OK"))
+                 .withAssociatedComponent (associatedComponent),
                 nullptr, AlertWindowMappings::messageBox);
 }
 
@@ -143,20 +174,21 @@ int JUCE_CALLTYPE NativeMessageBox::show (const MessageBoxOptions& options)
 
 void JUCE_CALLTYPE NativeMessageBox::showMessageBoxAsync (MessageBoxIconType iconType,
                                                           const String& title, const String& message,
-                                                          Component* /*associatedComponent*/,
+                                                          Component* associatedComponent,
                                                           ModalComponentManager::Callback* callback)
 {
     showDialog (MessageBoxOptions()
                   .withIconType (iconType)
                   .withTitle (title)
                   .withMessage (message)
-                  .withButton (TRANS("OK")),
+                  .withButton (TRANS("OK"))
+                  .withAssociatedComponent (associatedComponent),
                 callback, AlertWindowMappings::messageBox);
 }
 
 bool JUCE_CALLTYPE NativeMessageBox::showOkCancelBox (MessageBoxIconType iconType,
                                                       const String& title, const String& message,
-                                                      Component* /*associatedComponent*/,
+                                                      Component* associatedComponent,
                                                       ModalComponentManager::Callback* callback)
 {
     return showDialog (MessageBoxOptions()
@@ -164,13 +196,14 @@ bool JUCE_CALLTYPE NativeMessageBox::showOkCancelBox (MessageBoxIconType iconTyp
                          .withTitle (title)
                          .withMessage (message)
                          .withButton (TRANS("OK"))
-                         .withButton (TRANS("Cancel")),
+                         .withButton (TRANS("Cancel"))
+                         .withAssociatedComponent (associatedComponent),
                        callback, AlertWindowMappings::okCancel) != 0;
 }
 
 int JUCE_CALLTYPE NativeMessageBox::showYesNoCancelBox (MessageBoxIconType iconType,
                                                         const String& title, const String& message,
-                                                        Component* /*associatedComponent*/,
+                                                        Component* associatedComponent,
                                                         ModalComponentManager::Callback* callback)
 {
     return showDialog (MessageBoxOptions()
@@ -179,13 +212,14 @@ int JUCE_CALLTYPE NativeMessageBox::showYesNoCancelBox (MessageBoxIconType iconT
                          .withMessage (message)
                          .withButton (TRANS("Yes"))
                          .withButton (TRANS("No"))
-                         .withButton (TRANS("Cancel")),
+                         .withButton (TRANS("Cancel"))
+                         .withAssociatedComponent (associatedComponent),
                        callback, AlertWindowMappings::yesNoCancel);
 }
 
 int JUCE_CALLTYPE NativeMessageBox::showYesNoBox (MessageBoxIconType iconType,
                                                   const String& title, const String& message,
-                                                  Component* /*associatedComponent*/,
+                                                  Component* associatedComponent,
                                                   ModalComponentManager::Callback* callback)
 {
     return showDialog (MessageBoxOptions()
@@ -193,7 +227,8 @@ int JUCE_CALLTYPE NativeMessageBox::showYesNoBox (MessageBoxIconType iconType,
                          .withTitle (title)
                          .withMessage (message)
                          .withButton (TRANS("Yes"))
-                         .withButton (TRANS("No")),
+                         .withButton (TRANS("No"))
+                         .withAssociatedComponent (associatedComponent),
                        callback, AlertWindowMappings::okCancel);
 }
 
@@ -239,11 +274,11 @@ struct NSDraggingSourceHelper   : public ObjCClass<NSObject<NSDraggingSource>>
         addIvar<String*> ("text");
         addIvar<NSDragOperation*> ("operation");
 
-        addMethod (@selector (dealloc), dealloc, "v@:");
-        addMethod (@selector (pasteboard:item:provideDataForType:), provideDataForType, "v@:@@@");
+        addMethod (@selector (dealloc), dealloc);
+        addMethod (@selector (pasteboard:item:provideDataForType:), provideDataForType);
 
-        addMethod (@selector (draggingSession:sourceOperationMaskForDraggingContext:), sourceOperationMaskForDraggingContext, "c@:@@");
-        addMethod (@selector (draggingSession:endedAtPoint:operation:), draggingSessionEnded, "v@:@@@");
+        addMethod (@selector (draggingSession:sourceOperationMaskForDraggingContext:), sourceOperationMaskForDraggingContext);
+        addMethod (@selector (draggingSession:endedAtPoint:operation:), draggingSessionEnded);
 
         addProtocol (@protocol (NSPasteboardItemDataProvider));
 
@@ -430,6 +465,73 @@ Desktop::DisplayOrientation Desktop::getCurrentOrientation() const
     return upright;
 }
 
+bool Desktop::isDarkModeActive() const
+{
+    return [[[NSUserDefaults standardUserDefaults] stringForKey: nsStringLiteral ("AppleInterfaceStyle")]
+                isEqualToString: nsStringLiteral ("Dark")];
+}
+
+class Desktop::NativeDarkModeChangeDetectorImpl
+{
+public:
+    NativeDarkModeChangeDetectorImpl()
+    {
+        static DelegateClass delegateClass;
+
+        delegate = [delegateClass.createInstance() init];
+        object_setInstanceVariable (delegate, "owner", this);
+
+        JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wundeclared-selector")
+        [[NSDistributedNotificationCenter defaultCenter] addObserver: delegate
+                                                            selector: @selector (darkModeChanged:)
+                                                                name: @"AppleInterfaceThemeChangedNotification"
+                                                              object: nil];
+        JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+    }
+
+    ~NativeDarkModeChangeDetectorImpl()
+    {
+        object_setInstanceVariable (delegate, "owner", nullptr);
+        [[NSDistributedNotificationCenter defaultCenter] removeObserver: delegate];
+        [delegate release];
+    }
+
+    void darkModeChanged()
+    {
+        Desktop::getInstance().darkModeChanged();
+    }
+
+private:
+    struct DelegateClass  : public ObjCClass<NSObject>
+    {
+        DelegateClass()  : ObjCClass<NSObject> ("JUCEDelegate_")
+        {
+            addIvar<NativeDarkModeChangeDetectorImpl*> ("owner");
+
+            JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wundeclared-selector")
+            addMethod (@selector (darkModeChanged:), darkModeChanged);
+            JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+
+            registerClass();
+        }
+
+        static void darkModeChanged (id self, SEL, NSNotification*)
+        {
+            if (auto* owner = getIvar<NativeDarkModeChangeDetectorImpl*> (self, "owner"))
+                owner->darkModeChanged();
+        }
+    };
+
+    id delegate = nil;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NativeDarkModeChangeDetectorImpl)
+};
+
+std::unique_ptr<Desktop::NativeDarkModeChangeDetectorImpl> Desktop::createNativeDarkModeChangeDetectorImpl()
+{
+    return std::make_unique<NativeDarkModeChangeDetectorImpl>();
+}
+
 //==============================================================================
 class ScreenSaverDefeater   : public Timer
 {
@@ -577,13 +679,17 @@ static void selectImageForDrawing (const Image& image)
 {
     [NSGraphicsContext saveGraphicsState];
 
-   #if (defined (MAC_OS_X_VERSION_10_10) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_10)
-    [NSGraphicsContext setCurrentContext: [NSGraphicsContext graphicsContextWithCGContext: juce_getImageContext (image)
-                                                                                  flipped: false]];
-   #else
+    if (@available (macOS 10.10, *))
+    {
+        [NSGraphicsContext setCurrentContext: [NSGraphicsContext graphicsContextWithCGContext: juce_getImageContext (image)
+                                                                                      flipped: false]];
+        return;
+    }
+
+    JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wdeprecated-declarations")
     [NSGraphicsContext setCurrentContext: [NSGraphicsContext graphicsContextWithGraphicsPort: juce_getImageContext (image)
                                                                                      flipped: false]];
-   #endif
+    JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 }
 
 static void releaseImageAfterDrawing()
@@ -634,7 +740,6 @@ static Image createNSWindowSnapshot (NSWindow* nsWindow)
     }
 }
 
-Image createSnapshotOfNativeWindow (void*);
 Image createSnapshotOfNativeWindow (void* nativeWindowHandle)
 {
     if (id windowOrView = (id) nativeWindowHandle)
@@ -674,12 +779,6 @@ void Process::setDockIconVisible (bool isVisible)
                                                          : kProcessTransformToUIElementApplication);
     jassert (err == 0);
     ignoreUnused (err);
-}
-
-bool Desktop::isOSXDarkModeActive()
-{
-    return [[[NSUserDefaults standardUserDefaults] stringForKey: nsStringLiteral ("AppleInterfaceStyle")]
-                isEqualToString: nsStringLiteral ("Dark")];
 }
 
 } // namespace juce

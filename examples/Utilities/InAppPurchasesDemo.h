@@ -442,15 +442,17 @@ public:
 
     Component* refreshComponentForRow (int row, bool selected, Component* existing) override
     {
+        auto safePtr = rawToUniquePtr (existing);
+
         if (isPositiveAndBelow (row, voiceProducts.size()))
         {
-            if (existing == nullptr)
-                existing = new VoiceRow (purchases);
+            if (safePtr == nullptr)
+                safePtr = std::make_unique<VoiceRow> (purchases);
 
-            if (auto* voiceRow = dynamic_cast<VoiceRow*> (existing))
+            if (auto* voiceRow = dynamic_cast<VoiceRow*> (safePtr.get()))
                 voiceRow->update (row, selected);
 
-            return existing;
+            return safePtr.release();
         }
 
         return nullptr;
@@ -480,6 +482,8 @@ class InAppPurchasesDemo : public Component,
 public:
     InAppPurchasesDemo()
     {
+        manager.registerBasicFormats();
+
         Desktop::getInstance().getDefaultLookAndFeel().setUsingNativeAlertWindows (true);
 
         dm.addAudioCallback (&player);
@@ -497,7 +501,6 @@ public:
         voiceListBox.setRowHeight (66);
         voiceListBox.selectRow (0);
         voiceListBox.updateContent();
-        voiceListBox.getViewport()->setScrollOnDragEnabled (true);
 
         addAndMakeVisible (phraseLabel);
         addAndMakeVisible (phraseListBox);
@@ -568,12 +571,8 @@ private:
             auto assetName = "Purchases/" + soundNames[idx] + String (phraseListBox.getSelectedRow()) + ".ogg";
 
             if (auto fileStream = createAssetInputStream (assetName.toRawUTF8()))
-            {
-                currentPhraseData.reset();
-                fileStream->readIntoMemoryBlock (currentPhraseData);
-
-                player.play (currentPhraseData.getData(), currentPhraseData.getSize());
-            }
+                if (auto* reader = manager.createReaderFor (std::move (fileStream)))
+                    player.play (reader, true);
         }
     }
 
@@ -593,7 +592,7 @@ private:
     ListBox voiceListBox                       { "voiceListBox" };
     std::unique_ptr<VoiceModel> voiceModel     { new VoiceModel (purchases) };
 
-    MemoryBlock currentPhraseData;
+    AudioFormatManager manager;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (InAppPurchasesDemo)
 };

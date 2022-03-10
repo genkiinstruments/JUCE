@@ -47,7 +47,13 @@ struct HostProvidedContextMenu
     */
     virtual PopupMenu getEquivalentPopupMenu() const = 0;
 
-    /** Asks the host to display its native menu at a particular location. */
+    /** Asks the host to display its native menu at a location relative
+        to the top left corner of the editor.
+
+        The position you provide should be in logical pixels. To display
+        the menu next to the mouse cursor, call Component::getMouseXYRelative()
+        on your editor and pass the result to this function.
+    */
     virtual void showNativeMenu (Point<int> pos) const = 0;
 };
 
@@ -66,7 +72,18 @@ struct AudioProcessorEditorHostContext
     /** Returns an object which can be used to display a context menu for the
         parameter with the given index.
     */
-    virtual std::unique_ptr<HostProvidedContextMenu> getContextMenuForParameterIndex (const AudioProcessorParameter *) const = 0;
+    virtual std::unique_ptr<HostProvidedContextMenu> getContextMenuForParameter (const AudioProcessorParameter *) const = 0;
+
+    /** The naming of this function is misleading. Use getContextMenuForParameter() instead.
+
+        Returns an object which can be used to display a context menu for the
+        parameter with the given index.
+    */
+    [[deprecated ("The naming of this function has been fixed, use getContextMenuForParameter instead")]]
+    virtual std::unique_ptr<HostProvidedContextMenu> getContextMenuForParameterIndex (const AudioProcessorParameter * p) const
+    {
+        return getContextMenuForParameter (p);
+    }
 };
 
 } // namespace juce

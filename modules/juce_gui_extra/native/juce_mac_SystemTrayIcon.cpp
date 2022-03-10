@@ -26,7 +26,7 @@
 namespace juce
 {
 
-JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wunguarded-availability", "-Wdeprecated-declarations")
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wunguarded-availability", "-Wunguarded-availability-new", "-Wdeprecated-declarations")
 
 extern NSMenu* createNSMenu (const PopupMenu&, const String& name, int topLevelMenuId,
                              int topLevelIndex, bool addDelegate);
@@ -36,7 +36,7 @@ struct StatusItemContainer   : public Timer
 {
     //==============================================================================
     StatusItemContainer (SystemTrayIconComponent& iconComp, const Image& im)
-        : owner (iconComp), statusIcon (imageToNSImage (im))
+        : owner (iconComp), statusIcon (imageToNSImage (ScaledImage (im)))
     {
     }
 
@@ -51,7 +51,7 @@ struct StatusItemContainer   : public Timer
 
     void updateIcon (const Image& newImage)
     {
-        statusIcon.reset (imageToNSImage (newImage));
+        statusIcon.reset (imageToNSImage (ScaledImage (newImage)));
         setIconSize();
         configureIcon();
     }
@@ -117,6 +117,11 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
         }];
     }
 
+    ~ButtonBasedStatusItem() override
+    {
+        [statusItem.get() button].image = nullptr;
+    }
+
     void configureIcon() override
     {
         [statusIcon.get() setTemplate: true];
@@ -152,29 +157,30 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
 
             auto now = Time::getCurrentTime();
             auto mouseSource = Desktop::getInstance().getMainMouseSource();
+            auto pressure = (float) e.pressure;
 
             if (isLeft || isRight)
             {
                 owner.mouseDown ({ mouseSource, {},
                                    eventMods.withFlags (isLeft ? ModifierKeys::leftButtonModifier
                                                                : ModifierKeys::rightButtonModifier),
-                                   event.pressure,
-                                   MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
-                                   MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
+                                   pressure,
+                                   MouseInputSource::defaultOrientation, MouseInputSource::defaultRotation,
+                                   MouseInputSource::defaultTiltX, MouseInputSource::defaultTiltY,
                                    &owner, &owner, now, {}, now, 1, false });
 
                 owner.mouseUp   ({ mouseSource, {},
                                    eventMods.withoutMouseButtons(),
-                                   event.pressure,
-                                   MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
-                                   MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
+                                   pressure,
+                                   MouseInputSource::defaultOrientation, MouseInputSource::defaultRotation,
+                                   MouseInputSource::defaultTiltX, MouseInputSource::defaultTiltY,
                                    &owner, &owner, now, {}, now, 1, false });
             }
             else if (type == NSEventTypeMouseMoved)
             {
-                owner.mouseMove (MouseEvent (mouseSource, {}, eventMods, event.pressure,
-                                             MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
-                                             MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
+                owner.mouseMove (MouseEvent (mouseSource, {}, eventMods, pressure,
+                                             MouseInputSource::defaultOrientation, MouseInputSource::defaultRotation,
+                                             MouseInputSource::defaultTiltX, MouseInputSource::defaultTiltY,
                                              &owner, &owner, now, {}, now, 1, false));
             }
         }
@@ -190,7 +196,7 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
         {
             addIvar<ButtonBasedStatusItem*> ("owner");
 
-            addMethod (@selector (handleEvent:), handleEvent, "v@:@");
+            addMethod (@selector (handleEvent:), handleEvent);
 
             registerClass();
         }
@@ -290,20 +296,20 @@ struct ViewBasedStatusItem   : public StatusItemContainer
                 owner.mouseDown (MouseEvent (mouseSource, {},
                                              eventMods.withFlags (isLeft ? ModifierKeys::leftButtonModifier
                                                                          : ModifierKeys::rightButtonModifier),
-                                             pressure, MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
-                                             MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
+                                             pressure, MouseInputSource::defaultOrientation, MouseInputSource::defaultRotation,
+                                             MouseInputSource::defaultTiltX, MouseInputSource::defaultTiltY,
                                              &owner, &owner, now, {}, now, 1, false));
 
                 owner.mouseUp (MouseEvent (mouseSource, {}, eventMods.withoutMouseButtons(), pressure,
-                                           MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
-                                           MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
+                                           MouseInputSource::defaultOrientation, MouseInputSource::defaultRotation,
+                                           MouseInputSource::defaultTiltX, MouseInputSource::defaultTiltY,
                                            &owner, &owner, now, {}, now, 1, false));
             }
             else if (type == NSEventTypeMouseMoved)
             {
                 owner.mouseMove (MouseEvent (mouseSource, {}, eventMods, pressure,
-                                             MouseInputSource::invalidOrientation, MouseInputSource::invalidRotation,
-                                             MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
+                                             MouseInputSource::defaultOrientation, MouseInputSource::defaultRotation,
+                                             MouseInputSource::defaultTiltX, MouseInputSource::defaultTiltY,
                                              &owner, &owner, now, {}, now, 1, false));
             }
         }
@@ -317,12 +323,12 @@ struct ViewBasedStatusItem   : public StatusItemContainer
             addIvar<ViewBasedStatusItem*> ("owner");
             addIvar<NSImage*> ("image");
 
-            addMethod (@selector (mouseDown:),      handleEventDown, "v@:@");
-            addMethod (@selector (rightMouseDown:), handleEventDown, "v@:@");
-            addMethod (@selector (drawRect:),       drawRect,        "v@:@");
+            addMethod (@selector (mouseDown:),      handleEventDown);
+            addMethod (@selector (rightMouseDown:), handleEventDown);
+            addMethod (@selector (drawRect:),       drawRect);
 
             JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wundeclared-selector")
-            addMethod (@selector (frameChanged:),   frameChanged,    "v@:@");
+            addMethod (@selector (frameChanged:),   frameChanged);
             JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
             registerClass();

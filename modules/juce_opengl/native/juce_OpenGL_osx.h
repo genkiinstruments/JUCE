@@ -206,11 +206,7 @@ public:
         jassert (isPositiveAndBelow (numFramesPerSwap, 2));
 
         [renderContext setValues: (const GLint*) &numFramesPerSwap
-                   #if defined (MAC_OS_X_VERSION_10_12) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_12
-                    forParameter: NSOpenGLContextParameterSwapInterval];
-                   #else
-                    forParameter: NSOpenGLCPSwapInterval];
-                   #endif
+                    forParameter: getSwapIntervalParameter()];
 
         updateMinSwapTime();
 
@@ -221,11 +217,7 @@ public:
     {
         GLint numFrames = 0;
         [renderContext getValues: &numFrames
-                   #if defined (MAC_OS_X_VERSION_10_12) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_12
-                    forParameter: NSOpenGLContextParameterSwapInterval];
-                   #else
-                    forParameter: NSOpenGLCPSwapInterval];
-                   #endif
+                    forParameter: getSwapIntervalParameter()];
 
         return numFrames;
     }
@@ -242,11 +234,22 @@ public:
         minSwapTimeMs = static_cast<int> (numFramesPerSwap * 1000 * videoRefreshPeriodS);
     }
 
+    static NSOpenGLContextParameter getSwapIntervalParameter()
+    {
+        #if defined (MAC_OS_X_VERSION_10_12) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_12
+         if (@available (macOS 10.12, *))
+             return NSOpenGLContextParameterSwapInterval;
+        #endif
+
+        return NSOpenGLCPSwapInterval;
+    }
+
     NSOpenGLContext* renderContext = nil;
     NSOpenGLView* view = nil;
     ReferenceCountedObjectPtr<ReferenceCountedObject> viewAttachment;
     double lastSwapTime = 0;
-    int minSwapTimeMs = 0, underrunCounter = 0, numFramesPerSwap = 0;
+    std::atomic<int> minSwapTimeMs { 0 };
+    int underrunCounter = 0, numFramesPerSwap = 0;
     double videoRefreshPeriodS = 1.0 / 60.0;
 
     //==============================================================================
@@ -254,9 +257,10 @@ public:
     {
         MouseForwardingNSOpenGLViewClass()  : ObjCClass<NSOpenGLView> ("JUCEGLView_")
         {
-            addMethod (@selector (rightMouseDown:),      rightMouseDown,     "v@:@");
-            addMethod (@selector (rightMouseUp:),        rightMouseUp,       "v@:@");
-            addMethod (@selector (acceptsFirstMouse:),   acceptsFirstMouse,  "v@:@");
+            addMethod (@selector (rightMouseDown:),       rightMouseDown);
+            addMethod (@selector (rightMouseUp:),         rightMouseUp);
+            addMethod (@selector (acceptsFirstMouse:),    acceptsFirstMouse);
+            addMethod (@selector (accessibilityHitTest:), accessibilityHitTest);
 
             registerClass();
         }
@@ -265,6 +269,7 @@ public:
         static void rightMouseDown (id self, SEL, NSEvent* ev)      { [[(NSOpenGLView*) self superview] rightMouseDown: ev]; }
         static void rightMouseUp   (id self, SEL, NSEvent* ev)      { [[(NSOpenGLView*) self superview] rightMouseUp:   ev]; }
         static BOOL acceptsFirstMouse (id, SEL, NSEvent*)           { return YES; }
+        static id accessibilityHitTest (id self, SEL, NSPoint p)    { return [[(NSOpenGLView*) self superview] accessibilityHitTest: p]; }
     };
 
 

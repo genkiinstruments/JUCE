@@ -287,7 +287,7 @@ void Project::initialiseProjectValues()
     useAppConfigValue.referTo             (projectRoot, Ids::useAppConfig,                  getUndoManager(), true);
     addUsingNamespaceToJuceHeader.referTo (projectRoot, Ids::addUsingNamespaceToJuceHeader, getUndoManager(), true);
 
-    cppStandardValue.referTo       (projectRoot, Ids::cppLanguageStandard, getUndoManager(), "14");
+    cppStandardValue.referTo (projectRoot, Ids::cppLanguageStandard, getUndoManager(), "14");
 
     headerSearchPathsValue.referTo   (projectRoot, Ids::headerPath, getUndoManager());
     preprocessorDefsValue.referTo    (projectRoot, Ids::defines,    getUndoManager());
@@ -700,15 +700,17 @@ void Project::saveProject (Async async,
         return;
     }
 
-    if (saver != nullptr)
+    if (isTemporaryProject())
     {
-        onCompletion (Result::ok());
+        // Don't try to save a temporary project directly. Instead, check whether the
+        // project is temporary before saving it, and call saveAndMoveTemporaryProject
+        // in that case.
+        onCompletion (Result::fail ("Cannot save temporary project."));
         return;
     }
 
-    if (isTemporaryProject())
+    if (saver != nullptr)
     {
-        saveAndMoveTemporaryProject (false);
         onCompletion (Result::ok());
         return;
     }
@@ -731,9 +733,7 @@ void Project::saveProject (Async async,
             return;
 
         ref->saver = nullptr;
-
-        if (onCompletion != nullptr)
-            onCompletion (result);
+        NullCheckedInvocation::invoke (onCompletion, result);
     });
 }
 
@@ -824,6 +824,14 @@ void Project::updateJUCEPathWarning()
     {
         removeProjectMessage (ProjectMessages::Ids::jucePath);
     }
+}
+
+void Project::updateCodeWarning (Identifier identifier, String value)
+{
+    if (value.length() != 4 || value.toStdString().size() != 4)
+        addProjectMessage (identifier, {});
+    else
+        removeProjectMessage (identifier);
 }
 
 void Project::updateModuleWarnings()
@@ -1091,9 +1099,17 @@ void Project::valueTreePropertyChanged (ValueTree& tree, const Identifier& prope
         {
             updateModuleWarnings();
         }
-
-        changed();
+        else if (property == Ids::pluginCode)
+        {
+            updateCodeWarning (ProjectMessages::Ids::pluginCodeInvalid, pluginCodeValue.get());
+        }
+        else if (property == Ids::pluginManufacturerCode)
+        {
+            updateCodeWarning (ProjectMessages::Ids::manufacturerCodeInvalid, pluginManufacturerCodeValue.get());
+        }
     }
+
+    changed();
 }
 
 void Project::valueTreeChildAdded (ValueTree& parent, ValueTree& child)
@@ -1314,7 +1330,7 @@ void Project::createPropertyEditors (PropertyListBuilder& props)
                "which may simplify the includes in the project.");
 
     props.add (new ChoicePropertyComponent (addUsingNamespaceToJuceHeader, "Add \"using namespace juce\" to JuceHeader.h"),
-               "If enabled, the JuceHeader.h will include a \"using namepace juce\" statement. If disabled, "
+               "If enabled, the JuceHeader.h will include a \"using namespace juce\" statement. If disabled, "
                "no such statement will be included. This setting used to be enabled by default, but it "
                "is recommended to leave it disabled for new projects.");
 
@@ -2000,7 +2016,7 @@ ValueTree Project::getConfigNode()
     return projectRoot.getOrCreateChildWithName (Ids::JUCEOPTIONS, nullptr);
 }
 
-ValueWithDefault Project::getConfigFlag (const String& name)
+ValueTreePropertyWithDefault Project::getConfigFlag (const String& name)
 {
     auto configNode = getConfigNode();
 
@@ -2578,8 +2594,10 @@ StringPairArray Project::getAudioPluginFlags() const
         uint32 hexRepresentation = 0;
 
         for (int i = 0; i < 4; ++i)
-            hexRepresentation = (hexRepresentation << 8u)
-                                |  (static_cast<unsigned int> (fourCharCode[i]) & 0xffu);
+        {
+            const auto character = (unsigned int) (i < fourCharCode.length() ? fourCharCode[i] : 0);
+            hexRepresentation = (hexRepresentation << 8u) | (character & 0xffu);
+        }
 
         return "0x" + String::toHexString (static_cast<int> (hexRepresentation));
     };
@@ -2631,7 +2649,7 @@ StringPairArray Project::getAudioPluginFlags() const
     flags.set ("JucePlugin_AAXDisableMultiMono",         boolToString (isPluginAAXMultiMonoDisabled()));
     flags.set ("JucePlugin_IAAType",                     toCharLiteral (getIAATypeCode()));
     flags.set ("JucePlugin_IAASubType",                  "JucePlugin_PluginCode");
-    flags.set ("JucePlugin_IAAName",                     getIAAPluginName().quoted());
+    flags.set ("JucePlugin_IAAName",                     toStringLiteral (getIAAPluginName()));
     flags.set ("JucePlugin_VSTNumMidiInputs",            getVSTNumMIDIInputsString());
     flags.set ("JucePlugin_VSTNumMidiOutputs",           getVSTNumMIDIOutputsString());
 

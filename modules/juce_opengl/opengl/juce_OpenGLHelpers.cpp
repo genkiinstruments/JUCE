@@ -97,15 +97,18 @@ static Version getOpenGLVersion()
     const std::string versionString (versionBegin, versionEnd);
     const auto spaceSeparated = StringArray::fromTokens (versionString.c_str(), false);
 
-    if (spaceSeparated.isEmpty())
-        return {};
+    for (const auto& token : spaceSeparated)
+    {
+        const auto pointSeparated = StringArray::fromTokens (token, ".", "");
 
-    const auto pointSeparated = StringArray::fromTokens (spaceSeparated[0], ".", "");
+        const auto major = pointSeparated[0].getIntValue();
+        const auto minor = pointSeparated[1].getIntValue();
 
-    const auto major = pointSeparated[0].getIntValue();
-    const auto minor = pointSeparated[1].getIntValue();
+        if (major != 0)
+            return { major, minor };
+    }
 
-    return { major, minor };
+    return {};
 }
 
 void OpenGLHelpers::resetErrorState()
@@ -129,6 +132,23 @@ bool OpenGLHelpers::isExtensionSupported (const char* const extensionName)
 {
     jassert (extensionName != nullptr); // you must supply a genuine string for this.
     jassert (isContextActive()); // An OpenGL context will need to be active before calling this.
+
+    if (getOpenGLVersion().major >= 3)
+    {
+        using GetStringi = const GLubyte* (*) (GLenum, GLuint);
+
+        if (auto* thisGlGetStringi = reinterpret_cast<GetStringi> (getExtensionFunction ("glGetStringi")))
+        {
+            GLint n = 0;
+            glGetIntegerv (GL_NUM_EXTENSIONS, &n);
+
+            for (auto i = (decltype (n)) 0; i < n; ++i)
+                if (StringRef (extensionName) == StringRef ((const char*) thisGlGetStringi (GL_EXTENSIONS, (GLuint) i)))
+                    return true;
+
+            return false;
+        }
+    }
 
     const char* extensions = (const char*) glGetString (GL_EXTENSIONS);
     jassert (extensions != nullptr); // Perhaps you didn't activate an OpenGL context before calling this?

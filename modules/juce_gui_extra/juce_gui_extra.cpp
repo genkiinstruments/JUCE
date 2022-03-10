@@ -143,6 +143,7 @@
 #if JUCE_MAC || JUCE_IOS
 
  #if JUCE_MAC
+  #include "native/juce_mac_NSViewFrameWatcher.h"
   #include "native/juce_mac_NSViewComponent.mm"
   #include "native/juce_mac_AppleRemote.mm"
   #include "native/juce_mac_SystemTrayIcon.cpp"
@@ -189,7 +190,9 @@
 #endif
 
 //==============================================================================
-#if ! JUCE_WINDOWS
- juce::ScopedDPIAwarenessDisabler::ScopedDPIAwarenessDisabler()  { ignoreUnused (previousContext); }
- juce::ScopedDPIAwarenessDisabler::~ScopedDPIAwarenessDisabler() {}
+#if ! JUCE_WINDOWS && JUCE_WEB_BROWSER
+ juce::WebBrowserComponent::WebBrowserComponent (ConstructWithoutPimpl) {}
+ juce::WindowsWebView2WebBrowserComponent::WindowsWebView2WebBrowserComponent (bool unloadWhenHidden,
+                                                                               const WebView2Preferences&)
+     : WebBrowserComponent (unloadWhenHidden) {}
 #endif

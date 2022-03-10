@@ -300,6 +300,7 @@ function(_juce_write_configure_time_info target)
     _juce_append_target_property(file_content BACKGROUND_AUDIO_ENABLED             ${target} JUCE_BACKGROUND_AUDIO_ENABLED)
     _juce_append_target_property(file_content BACKGROUND_BLE_ENABLED               ${target} JUCE_BACKGROUND_BLE_ENABLED)
     _juce_append_target_property(file_content PUSH_NOTIFICATIONS_ENABLED           ${target} JUCE_PUSH_NOTIFICATIONS_ENABLED)
+    _juce_append_target_property(file_content NETWORK_MULTICAST_ENABLED            ${target} JUCE_NETWORK_MULTICAST_ENABLED)
     _juce_append_target_property(file_content PLUGIN_MANUFACTURER_CODE             ${target} JUCE_PLUGIN_MANUFACTURER_CODE)
     _juce_append_target_property(file_content PLUGIN_CODE                          ${target} JUCE_PLUGIN_CODE)
     _juce_append_target_property(file_content IPHONE_SCREEN_ORIENTATIONS           ${target} JUCE_IPHONE_SCREEN_ORIENTATIONS)
@@ -317,6 +318,10 @@ function(_juce_write_configure_time_info target)
     _juce_append_target_property(file_content APP_SANDBOX_INHERIT                  ${target} JUCE_APP_SANDBOX_INHERIT)
     _juce_append_target_property(file_content HARDENED_RUNTIME_OPTIONS             ${target} JUCE_HARDENED_RUNTIME_OPTIONS)
     _juce_append_target_property(file_content APP_SANDBOX_OPTIONS                  ${target} JUCE_APP_SANDBOX_OPTIONS)
+    _juce_append_target_property(file_content APP_SANDBOX_FILE_ACCESS_HOME_RO      ${target} JUCE_APP_SANDBOX_FILE_ACCESS_HOME_RO)
+    _juce_append_target_property(file_content APP_SANDBOX_FILE_ACCESS_HOME_RW      ${target} JUCE_APP_SANDBOX_FILE_ACCESS_HOME_RW)
+    _juce_append_target_property(file_content APP_SANDBOX_FILE_ACCESS_ABS_RO       ${target} JUCE_APP_SANDBOX_FILE_ACCESS_ABS_RO)
+    _juce_append_target_property(file_content APP_SANDBOX_FILE_ACCESS_ABS_RW       ${target} JUCE_APP_SANDBOX_FILE_ACCESS_ABS_RW)
     _juce_append_target_property(file_content APP_GROUPS_ENABLED                   ${target} JUCE_APP_GROUPS_ENABLED)
     _juce_append_target_property(file_content APP_GROUP_IDS                        ${target} JUCE_APP_GROUP_IDS)
     _juce_append_target_property(file_content IS_PLUGIN                            ${target} JUCE_IS_PLUGIN)
@@ -446,8 +451,12 @@ function(_juce_version_code version_in out_var)
     set(${out_var} "${hex}" PARENT_SCOPE)
 endfunction()
 
-function(_juce_to_char_literal str out_var)
-    string(APPEND str "    ") # Make sure there are at least 4 characters in the string.
+function(_juce_to_char_literal str out_var help_text)
+    string(LENGTH "${str}" string_length)
+
+    if(NOT "${string_length}" EQUAL "4")
+        message(WARNING "The ${help_text} code must contain exactly four characters, but it was set to '${str}'")
+    endif()
 
     # Round-tripping through a file is the simplest way to convert a string to hex...
     string(SUBSTRING "${str}" 0 4 four_chars)
@@ -458,7 +467,8 @@ function(_juce_to_char_literal str out_var)
     file(READ "${scratch_file}" four_chars_hex HEX)
     file(REMOVE "${scratch_file}")
 
-    set(${out_var} ${four_chars_hex} PARENT_SCOPE)
+    string(SUBSTRING "${four_chars_hex}00000000" 0 8 four_chars_hex)
+    set(${out_var} "${four_chars_hex}" PARENT_SCOPE)
 endfunction()
 
 # ==================================================================================================
@@ -850,7 +860,15 @@ function(juce_enable_copy_plugin_step shared_code_target)
         get_target_property(source "${target}" JUCE_PLUGIN_ARTEFACT_FILE)
 
         if(source)
-            get_target_property(dest   "${target}" JUCE_PLUGIN_COPY_DIR)
+            if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+                add_custom_command(TARGET ${target} POST_BUILD
+                    COMMAND "${CMAKE_COMMAND}"
+                        "-Dsrc=${source}"
+                        "-P" "${JUCE_CMAKE_UTILS_DIR}/checkBundleSigning.cmake"
+                    VERBATIM)
+            endif()
+
+            get_target_property(dest "${target}" JUCE_PLUGIN_COPY_DIR)
 
             if(dest)
                 _juce_copy_dir("${target}" "${source}" "$<GENEX_EVAL:${dest}>")
@@ -1137,11 +1155,11 @@ function(_juce_configure_plugin_targets target)
     get_target_property(use_legacy_compatibility_plugin_code ${target} JUCE_USE_LEGACY_COMPATIBILITY_PLUGIN_CODE)
 
     if(use_legacy_compatibility_plugin_code)
-        set(project_manufacturer_code "project_manufacturer_code-NOTFOUND")
+        set(project_manufacturer_code "proj")
     endif()
 
-    _juce_to_char_literal(${project_manufacturer_code} project_manufacturer_code)
-    _juce_to_char_literal(${project_plugin_code} project_plugin_code)
+    _juce_to_char_literal(${project_manufacturer_code} project_manufacturer_code "plugin manufacturer")
+    _juce_to_char_literal(${project_plugin_code} project_plugin_code "plugin")
 
     _juce_get_vst3_category_string(${target} vst3_category_string)
 
@@ -1493,6 +1511,7 @@ function(_juce_initialise_target target)
         NEEDS_WEB_BROWSER               # Set this true if you want to link webkit on Linux
         NEEDS_STORE_KIT                 # Set this true if you want in-app-purchases on Mac
         PUSH_NOTIFICATIONS_ENABLED
+        NETWORK_MULTICAST_ENABLED
         HARDENED_RUNTIME_ENABLED
         APP_SANDBOX_ENABLED
         APP_SANDBOX_INHERIT
@@ -1531,6 +1550,10 @@ function(_juce_initialise_target target)
         VST3_CATEGORIES
         HARDENED_RUNTIME_OPTIONS
         APP_SANDBOX_OPTIONS
+        APP_SANDBOX_FILE_ACCESS_HOME_RO
+        APP_SANDBOX_FILE_ACCESS_HOME_RW
+        APP_SANDBOX_FILE_ACCESS_ABS_RO
+        APP_SANDBOX_FILE_ACCESS_ABS_RW
         DOCUMENT_EXTENSIONS
         AAX_CATEGORY
         IPHONE_SCREEN_ORIENTATIONS      # iOS only
@@ -1605,18 +1628,7 @@ function(_juce_initialise_target target)
 
     _juce_write_generate_time_info(${target})
     _juce_link_optional_libraries(${target})
-
-    if(JUCE_ENABLE_MODULE_SOURCE_GROUPS)
-        get_property(all_modules GLOBAL PROPERTY _juce_module_names)
-
-        foreach(module_name IN LISTS all_modules)
-            get_target_property(path ${module_name} INTERFACE_JUCE_MODULE_PATH)
-            get_target_property(header_files ${module_name} INTERFACE_JUCE_MODULE_HEADERS)
-            get_target_property(source_files ${module_name} INTERFACE_JUCE_MODULE_SOURCES)
-            source_group(TREE ${path} PREFIX "JUCE Modules" FILES ${header_files} ${source_files})
-            set_source_files_properties(${header_files} PROPERTIES HEADER_FILE_ONLY TRUE)
-        endforeach()
-    endif()
+    _juce_fixup_module_source_groups()
 endfunction()
 
 # ==================================================================================================

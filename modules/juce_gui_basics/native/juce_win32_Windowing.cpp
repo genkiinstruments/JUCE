@@ -27,10 +27,6 @@
  #include <juce_audio_plugin_client/AAX/juce_AAX_Modifier_Injector.h>
 #endif
 
-#if JUCE_MODULE_AVAILABLE_juce_gui_extra
- #include <juce_gui_extra/embedding/juce_ScopedDPIAwarenessDisabler.h>
-#endif
-
 namespace juce
 {
 
@@ -357,6 +353,7 @@ using SetProcessDPIAwarenessFunc               = HRESULT               (WINAPI*)
 using SetThreadDPIAwarenessContextFunc         = DPI_AWARENESS_CONTEXT (WINAPI*) (DPI_AWARENESS_CONTEXT);
 using GetDPIForWindowFunc                      = UINT                  (WINAPI*) (HWND);
 using GetDPIForMonitorFunc                     = HRESULT               (WINAPI*) (HMONITOR, Monitor_DPI_Type, UINT*, UINT*);
+using GetSystemMetricsForDpiFunc               = int                   (WINAPI*) (int, UINT);
 using GetProcessDPIAwarenessFunc               = HRESULT               (WINAPI*) (HANDLE, DPI_Awareness*);
 using GetWindowDPIAwarenessContextFunc         = DPI_AWARENESS_CONTEXT (WINAPI*) (HWND);
 using GetThreadDPIAwarenessContextFunc         = DPI_AWARENESS_CONTEXT (WINAPI*) ();
@@ -377,6 +374,32 @@ static EnableNonClientDPIScalingFunc           enableNonClientDPIScaling        
 
 static bool hasCheckedForDPIAwareness = false;
 
+static void loadDPIAwarenessFunctions()
+{
+    setProcessDPIAware = (SetProcessDPIAwareFunc) getUser32Function ("SetProcessDPIAware");
+
+    constexpr auto shcore = "SHCore.dll";
+    LoadLibraryA (shcore);
+    const auto shcoreModule = GetModuleHandleA (shcore);
+
+    if (shcoreModule == nullptr)
+        return;
+
+    getDPIForMonitor                    = (GetDPIForMonitorFunc) GetProcAddress (shcoreModule, "GetDpiForMonitor");
+    setProcessDPIAwareness              = (SetProcessDPIAwarenessFunc) GetProcAddress (shcoreModule, "SetProcessDpiAwareness");
+
+   #if JUCE_WIN_PER_MONITOR_DPI_AWARE
+    getDPIForWindow                     = (GetDPIForWindowFunc) getUser32Function ("GetDpiForWindow");
+    getProcessDPIAwareness              = (GetProcessDPIAwarenessFunc) GetProcAddress (shcoreModule, "GetProcessDpiAwareness");
+    getWindowDPIAwarenessContext        = (GetWindowDPIAwarenessContextFunc) getUser32Function ("GetWindowDpiAwarenessContext");
+    setThreadDPIAwarenessContext        = (SetThreadDPIAwarenessContextFunc) getUser32Function ("SetThreadDpiAwarenessContext");
+    getThreadDPIAwarenessContext        = (GetThreadDPIAwarenessContextFunc) getUser32Function ("GetThreadDpiAwarenessContext");
+    getAwarenessFromDPIAwarenessContext = (GetAwarenessFromDpiAwarenessContextFunc) getUser32Function ("GetAwarenessFromDpiAwarenessContext");
+    setProcessDPIAwarenessContext       = (SetProcessDPIAwarenessContextFunc) getUser32Function ("SetProcessDpiAwarenessContext");
+    enableNonClientDPIScaling           = (EnableNonClientDPIScalingFunc) getUser32Function ("EnableNonClientDpiScaling");
+   #endif
+}
+
 static void setDPIAwareness()
 {
     if (hasCheckedForDPIAwareness)
@@ -387,45 +410,19 @@ static void setDPIAwareness()
     if (! JUCEApplicationBase::isStandaloneApp())
         return;
 
-    const auto shcore = "SHCore.dll";
-    LoadLibraryA (shcore);
-    const auto shcoreModule = GetModuleHandleA (shcore);
+    loadDPIAwarenessFunctions();
 
-    if (shcoreModule != nullptr)
-    {
-        getDPIForMonitor = (GetDPIForMonitorFunc) GetProcAddress (shcoreModule, "GetDpiForMonitor");
+    if (setProcessDPIAwarenessContext != nullptr
+        && setProcessDPIAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+        return;
 
-       #if JUCE_WIN_PER_MONITOR_DPI_AWARE
-        getDPIForWindow                     = (GetDPIForWindowFunc) getUser32Function ("GetDpiForWindow");
-        getProcessDPIAwareness              = (GetProcessDPIAwarenessFunc) GetProcAddress (shcoreModule, "GetProcessDpiAwareness");
-        getWindowDPIAwarenessContext        = (GetWindowDPIAwarenessContextFunc) getUser32Function ("GetWindowDpiAwarenessContext");
-        setThreadDPIAwarenessContext        = (SetThreadDPIAwarenessContextFunc) getUser32Function ("SetThreadDpiAwarenessContext");
-        getThreadDPIAwarenessContext        = (GetThreadDPIAwarenessContextFunc) getUser32Function ("GetThreadDpiAwarenessContext");
-        getAwarenessFromDPIAwarenessContext = (GetAwarenessFromDpiAwarenessContextFunc) getUser32Function ("GetAwarenessFromDpiAwarenessContext");
-        setProcessDPIAwareness              = (SetProcessDPIAwarenessFunc) GetProcAddress (shcoreModule, "SetProcessDpiAwareness");
-        setProcessDPIAwarenessContext       = (SetProcessDPIAwarenessContextFunc) getUser32Function ("SetProcessDpiAwarenessContext");
+    if (setProcessDPIAwareness != nullptr && enableNonClientDPIScaling != nullptr
+        && SUCCEEDED (setProcessDPIAwareness (DPI_Awareness::DPI_Awareness_Per_Monitor_Aware)))
+        return;
 
-        if (setProcessDPIAwarenessContext != nullptr
-            && setProcessDPIAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
-            return;
-
-        enableNonClientDPIScaling = (EnableNonClientDPIScalingFunc) getUser32Function ("EnableNonClientDpiScaling");
-
-        if (setProcessDPIAwareness != nullptr && enableNonClientDPIScaling != nullptr
-            && SUCCEEDED (setProcessDPIAwareness (DPI_Awareness::DPI_Awareness_Per_Monitor_Aware)))
-            return;
-       #endif
-
-        if (setProcessDPIAwareness == nullptr)
-            setProcessDPIAwareness = (SetProcessDPIAwarenessFunc) GetProcAddress (shcoreModule, "SetProcessDpiAwareness");
-
-        if (setProcessDPIAwareness != nullptr && getDPIForMonitor != nullptr
-             && SUCCEEDED (setProcessDPIAwareness (DPI_Awareness::DPI_Awareness_System_Aware)))
-            return;
-    }
-
-    // fallback for pre Windows 8.1 - equivalent to Process_System_DPI_Aware
-    setProcessDPIAware = (SetProcessDPIAwareFunc) getUser32Function ("SetProcessDPIAware");
+    if (setProcessDPIAwareness != nullptr && getDPIForMonitor != nullptr
+        && SUCCEEDED (setProcessDPIAwareness (DPI_Awareness::DPI_Awareness_System_Aware)))
+        return;
 
     if (setProcessDPIAware != nullptr)
         setProcessDPIAware();
@@ -439,6 +436,9 @@ static bool isPerMonitorDPIAwareProcess()
     static bool dpiAware = []() -> bool
     {
         setDPIAwareness();
+
+        if (! JUCEApplication::isStandaloneApp())
+            return false;
 
         if (getProcessDPIAwareness == nullptr)
             return false;
@@ -572,38 +572,34 @@ ScopedThreadDPIAwarenessSetter::ScopedThreadDPIAwarenessSetter (void* nativeWind
     pimpl = std::make_unique<NativeImpl> ((HWND) nativeWindow);
 }
 
-ScopedThreadDPIAwarenessSetter::~ScopedThreadDPIAwarenessSetter()
+ScopedThreadDPIAwarenessSetter::~ScopedThreadDPIAwarenessSetter() = default;
+
+ScopedDPIAwarenessDisabler::ScopedDPIAwarenessDisabler()
 {
+    if (! isPerMonitorDPIAwareThread())
+        return;
+
+    if (setThreadDPIAwarenessContext != nullptr)
+    {
+        previousContext = setThreadDPIAwarenessContext (DPI_AWARENESS_CONTEXT_UNAWARE);
+
+       #if JUCE_DEBUG
+        ++numActiveScopedDpiAwarenessDisablers;
+       #endif
+    }
 }
 
-#if JUCE_MODULE_AVAILABLE_juce_gui_extra
- ScopedDPIAwarenessDisabler::ScopedDPIAwarenessDisabler()
- {
-     if (! isPerMonitorDPIAwareThread())
-         return;
+ScopedDPIAwarenessDisabler::~ScopedDPIAwarenessDisabler()
+{
+    if (previousContext != nullptr)
+    {
+        setThreadDPIAwarenessContext ((DPI_AWARENESS_CONTEXT) previousContext);
 
-     if (setThreadDPIAwarenessContext != nullptr)
-     {
-         previousContext = setThreadDPIAwarenessContext (DPI_AWARENESS_CONTEXT_UNAWARE);
-
-        #if JUCE_DEBUG
-         ++numActiveScopedDpiAwarenessDisablers;
-        #endif
-     }
- }
-
- ScopedDPIAwarenessDisabler::~ScopedDPIAwarenessDisabler()
- {
-     if (previousContext != nullptr)
-     {
-         setThreadDPIAwarenessContext ((DPI_AWARENESS_CONTEXT) previousContext);
-
-        #if JUCE_DEBUG
-         --numActiveScopedDpiAwarenessDisablers;
-        #endif
-     }
- }
-#endif
+       #if JUCE_DEBUG
+        --numActiveScopedDpiAwarenessDisablers;
+       #endif
+    }
+}
 
 //==============================================================================
 using SettingChangeCallbackFunc = void (*)(void);
@@ -619,7 +615,7 @@ static POINT POINTFromPoint (Point<int> p) noexcept          { return { p.x, p.y
 //==============================================================================
 static const Displays::Display* getCurrentDisplayFromScaleFactor (HWND hwnd);
 
-template<typename ValueType>
+template <typename ValueType>
 static Rectangle<ValueType> convertPhysicalScreenRectangleToLogical (Rectangle<ValueType> r, HWND h) noexcept
 {
     if (isPerMonitorDPIAwareWindow (h))
@@ -628,7 +624,7 @@ static Rectangle<ValueType> convertPhysicalScreenRectangleToLogical (Rectangle<V
     return r;
 }
 
-template<typename ValueType>
+template <typename ValueType>
 static Rectangle<ValueType> convertLogicalScreenRectangleToPhysical (Rectangle<ValueType> r, HWND h) noexcept
 {
     if (isPerMonitorDPIAwareWindow (h))
@@ -720,6 +716,10 @@ static void setWindowZOrder (HWND hwnd, HWND insertAfter)
 }
 
 //==============================================================================
+#if ! JUCE_MINGW
+extern RTL_OSVERSIONINFOW getWindowsVersionInfo();
+#endif
+
 double Desktop::getDefaultMasterScale()
 {
     if (! JUCEApplicationBase::isStandaloneApp() || isPerMonitorDPIAwareProcess())
@@ -728,7 +728,102 @@ double Desktop::getDefaultMasterScale()
     return getGlobalDPI() / USER_DEFAULT_SCREEN_DPI;
 }
 
-bool Desktop::canUseSemiTransparentWindows() noexcept { return true; }
+bool Desktop::canUseSemiTransparentWindows() noexcept
+{
+    return true;
+}
+
+class Desktop::NativeDarkModeChangeDetectorImpl
+{
+public:
+    NativeDarkModeChangeDetectorImpl()
+    {
+       #if ! JUCE_MINGW
+        const auto winVer = getWindowsVersionInfo();
+
+        if (winVer.dwMajorVersion >= 10 && winVer.dwBuildNumber >= 17763)
+        {
+            const auto uxtheme = "uxtheme.dll";
+            LoadLibraryA (uxtheme);
+            const auto uxthemeModule = GetModuleHandleA (uxtheme);
+
+            if (uxthemeModule != nullptr)
+            {
+                shouldAppsUseDarkMode = (ShouldAppsUseDarkModeFunc) GetProcAddress (uxthemeModule, MAKEINTRESOURCEA (132));
+
+                if (shouldAppsUseDarkMode != nullptr)
+                    darkModeEnabled = shouldAppsUseDarkMode() && ! isHighContrast();
+            }
+        }
+       #endif
+    }
+
+    ~NativeDarkModeChangeDetectorImpl()
+    {
+        UnhookWindowsHookEx (hook);
+    }
+
+    bool isDarkModeEnabled() const noexcept  { return darkModeEnabled; }
+
+private:
+    static bool isHighContrast()
+    {
+        HIGHCONTRASTW highContrast {};
+
+        if (SystemParametersInfoW (SPI_GETHIGHCONTRAST, sizeof (highContrast), &highContrast, false))
+            return highContrast.dwFlags & HCF_HIGHCONTRASTON;
+
+        return false;
+    }
+
+    static LRESULT CALLBACK callWndProc (int nCode, WPARAM wParam, LPARAM lParam)
+    {
+        auto* params = reinterpret_cast<CWPSTRUCT*> (lParam);
+
+        if (nCode >= 0
+            && params != nullptr
+            && params->message == WM_SETTINGCHANGE
+            && params->lParam != 0
+            && CompareStringOrdinal (reinterpret_cast<LPWCH> (params->lParam), -1, L"ImmersiveColorSet", -1, true) == CSTR_EQUAL)
+        {
+            Desktop::getInstance().nativeDarkModeChangeDetectorImpl->colourSetChanged();
+        }
+
+        return CallNextHookEx ({}, nCode, wParam, lParam);
+    }
+
+    void colourSetChanged()
+    {
+        if (shouldAppsUseDarkMode != nullptr)
+        {
+            const auto wasDarkModeEnabled = std::exchange (darkModeEnabled, shouldAppsUseDarkMode() && ! isHighContrast());
+
+            if (darkModeEnabled != wasDarkModeEnabled)
+                Desktop::getInstance().darkModeChanged();
+        }
+    }
+
+    using ShouldAppsUseDarkModeFunc = bool (WINAPI*)();
+    ShouldAppsUseDarkModeFunc shouldAppsUseDarkMode = nullptr;
+
+    bool darkModeEnabled = false;
+    HHOOK hook { SetWindowsHookEx (WH_CALLWNDPROC,
+                                   callWndProc,
+                                   (HINSTANCE) juce::Process::getCurrentModuleInstanceHandle(),
+                                   GetCurrentThreadId()) };
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NativeDarkModeChangeDetectorImpl)
+};
+
+std::unique_ptr<Desktop::NativeDarkModeChangeDetectorImpl> Desktop::createNativeDarkModeChangeDetectorImpl()
+{
+    return std::make_unique<NativeDarkModeChangeDetectorImpl>();
+}
+
+bool Desktop::isDarkModeActive() const
+{
+    return nativeDarkModeChangeDetectorImpl->isDarkModeEnabled();
+}
 
 Desktop::DisplayOrientation Desktop::getCurrentOrientation() const
 {
@@ -900,7 +995,9 @@ public:
 
     void initialiseBitmapData (Image::BitmapData& bitmap, int x, int y, Image::BitmapData::ReadWriteMode mode) override
     {
-        bitmap.data = imageData + x * pixelStride + y * lineStride;
+        const auto offset = (size_t) (x * pixelStride + y * lineStride);
+        bitmap.data = imageData + offset;
+        bitmap.size = (size_t) (lineStride * height) - offset;
         bitmap.pixelFormat = pixelFormat;
         bitmap.lineStride = lineStride;
         bitmap.pixelStride = pixelStride;
@@ -969,7 +1066,6 @@ private:
 };
 
 //==============================================================================
-Image createSnapshotOfNativeWindow (void*);
 Image createSnapshotOfNativeWindow (void* nativeWindowHandle)
 {
     auto hwnd = (HWND) nativeWindowHandle;
@@ -1044,7 +1140,6 @@ namespace IconConverters
 
         if (auto* dc = ::CreateCompatibleDC (deviceContext.dc))
         {
-            JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wfour-char-constants")
             BITMAPV5HEADER header = {};
             header.bV5Size = sizeof (BITMAPV5HEADER);
             header.bV5Width = bm.bmWidth;
@@ -1056,15 +1151,8 @@ namespace IconConverters
             header.bV5GreenMask = 0x0000FF00;
             header.bV5BlueMask = 0x000000FF;
             header.bV5AlphaMask = 0xFF000000;
-
-           #if JUCE_MINGW
-            header.bV5CSType = 'Win ';
-           #else
-            header.bV5CSType = LCS_WINDOWS_COLOR_SPACE;
-           #endif
-
+            header.bV5CSType = 0x57696E20; // 'Win '
             header.bV5Intent = LCS_GM_IMAGES;
-            JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
             uint32* bitmapImageData = nullptr;
 
@@ -1154,6 +1242,15 @@ JUCE_IUNKNOWNCLASS (ITipInvocation, "37c994e7-432b-4834-a2f7-dce1f13b834b")
 
     JUCE_COMCALL Toggle (HWND) = 0;
 };
+
+} // namespace juce
+
+#ifdef __CRT_UUID_DECL
+__CRT_UUID_DECL (juce::ITipInvocation, 0x37c994e7, 0x432b, 0x4834, 0xa2, 0xf7, 0xdc, 0xe1, 0xf1, 0x3b, 0x83, 0x4b)
+#endif
+
+namespace juce
+{
 
 struct OnScreenKeyboard   : public DeletedAtShutdown,
                             private Timer
@@ -1269,7 +1366,15 @@ JUCE_COMCLASS (IUIViewSettings, "c63657f6-8850-470d-88f8-455e16ea2c26")  : publi
     JUCE_COMCALL GetUserInteractionMode (UserInteractionMode*) = 0;
 };
 
+} // namespace juce
 
+#ifdef __CRT_UUID_DECL
+__CRT_UUID_DECL (juce::IUIViewSettingsInterop, 0x3694dbf9, 0x8f68, 0x44be, 0x8f, 0xf5, 0x19, 0x5c, 0x98, 0xed, 0xe8, 0xa6)
+__CRT_UUID_DECL (juce::IUIViewSettings,        0xc63657f6, 0x8850, 0x470d, 0x88, 0xf8, 0x45, 0x5e, 0x16, 0xea, 0x2c, 0x26)
+#endif
+
+namespace juce
+{
 struct UWPUIViewSettings
 {
     UWPUIViewSettings()
@@ -1341,7 +1446,7 @@ private:
     //==============================================================================
     struct ComBaseModule
     {
-        ComBaseModule() {}
+        ComBaseModule() = default;
         ComBaseModule (LPCWSTR libraryName) : h (::LoadLibrary (libraryName)) {}
         ComBaseModule (ComBaseModule&& o) : h (o.h) { o.h = nullptr; }
         ~ComBaseModule() { release(); }
@@ -1485,6 +1590,13 @@ public:
 
     void setBounds (const Rectangle<int>& bounds, bool isNowFullScreen) override
     {
+        // If we try to set new bounds while handling an existing position change,
+        // Windows may get confused about our current scale and size.
+        // This can happen when moving a window between displays, because the mouse-move
+        // generator in handlePositionChanged can cause the window to move again.
+        if (inHandlePositionChanged)
+            return;
+
         const ScopedValueSetter<bool> scope (shouldIgnoreModalDismiss, true);
 
         fullScreen = isNowFullScreen;
@@ -1510,7 +1622,7 @@ public:
         if (! hasMoved)    flags |= SWP_NOMOVE;
         if (! hasResized)  flags |= SWP_NOSIZE;
 
-        setWindowPos (hwnd, newBounds, flags, numInDpiChange == 0);
+        setWindowPos (hwnd, newBounds, flags, ! inDpiChange);
 
         if (hasResized && isValidPeer (this))
         {
@@ -1582,7 +1694,7 @@ public:
         const ScopedValueSetter<bool> scope (shouldIgnoreModalDismiss, true);
 
         if (shouldBeMinimised != isMinimised())
-            ShowWindow (hwnd, shouldBeMinimised ? SW_MINIMIZE : SW_SHOWNORMAL);
+            ShowWindow (hwnd, shouldBeMinimised ? SW_MINIMIZE : SW_RESTORE);
     }
 
     bool isMinimised() const override
@@ -1657,6 +1769,11 @@ public:
                                                                                        hwnd)));
 
         return w == hwnd || (trueIfInAChildWindow && (IsChild (hwnd, w) != 0));
+    }
+
+    OptionalBorderSize getFrameSizeIfPresent() const override
+    {
+        return ComponentPeer::OptionalBorderSize { windowBorder };
     }
 
     BorderSize<int> getFrameSize() const override
@@ -1883,8 +2000,9 @@ public:
     private:
         Point<float> getMousePos (POINTL mousePos) const
         {
-            return peer.getComponent().getLocalPoint (nullptr, convertPhysicalScreenPointToLogical (pointFromPOINT ({ mousePos.x, mousePos.y }),
-                                                                                                    (HWND) peer.getNativeHandle()).toFloat());
+            const auto originalPos = pointFromPOINT ({ mousePos.x, mousePos.y });
+            const auto logicalPos = convertPhysicalScreenPointToLogical (originalPos, peer.hwnd);
+            return ScalingHelpers::screenPosToLocalPos (peer.component, logicalPos.toFloat());
         }
 
         struct DroppedData
@@ -2027,7 +2145,7 @@ private:
    #endif
 
     double scaleFactor = 1.0;
-    int numInDpiChange = 0;
+    bool inDpiChange = 0, inHandlePositionChanged = 0;
 
     bool isAccessibilityActive = false;
 
@@ -2296,6 +2414,13 @@ private:
         }
         else
         {
+            TCHAR messageBuffer[256] = {};
+
+            FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                           nullptr, GetLastError(), MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),
+                           messageBuffer, (DWORD) numElementsInArray (messageBuffer) - 1, nullptr);
+
+            DBG (messageBuffer);
             jassertfalse;
         }
     }
@@ -2321,7 +2446,7 @@ private:
 
     static void* toFrontCallback1 (void* h)
     {
-        SetForegroundWindow ((HWND) h);
+        BringWindowToTop ((HWND) h);
         return nullptr;
     }
 
@@ -2354,7 +2479,7 @@ private:
         if (! component.isCurrentlyModal() && (styleFlags & windowHasDropShadow) != 0
             && ((! hasTitleBar()) || SystemStats::getOperatingSystemType() < SystemStats::WinVista))
         {
-            shadower.reset (component.getLookAndFeel().createDropShadowerForComponent (&component));
+            shadower = component.getLookAndFeel().createDropShadowerForComponent (component);
 
             if (shadower != nullptr)
                 shadower->setOwner (&component);
@@ -2700,8 +2825,8 @@ private:
         if (now >= lastMouseTime + minTimeBetweenMouses)
         {
             lastMouseTime = now;
-            doMouseEvent (position, MouseInputSource::invalidPressure,
-                          MouseInputSource::invalidOrientation, modsToSend);
+            doMouseEvent (position, MouseInputSource::defaultPressure,
+                          MouseInputSource::defaultOrientation, modsToSend);
         }
     }
 
@@ -2727,7 +2852,7 @@ private:
 
             isDragging = true;
 
-            doMouseEvent (position, MouseInputSource::invalidPressure);
+            doMouseEvent (position, MouseInputSource::defaultPressure);
         }
     }
 
@@ -2754,7 +2879,7 @@ private:
         // NB: under some circumstances (e.g. double-clicking a native title bar), a mouse-up can
         // arrive without a mouse-down, so in that case we need to avoid sending a message.
         if (wasDragging)
-            doMouseEvent (position, MouseInputSource::invalidPressure);
+            doMouseEvent (position, MouseInputSource::defaultPressure);
     }
 
     void doCaptureChanged()
@@ -2776,7 +2901,7 @@ private:
         isMouseOver = false;
 
         if (! areOtherTouchSourcesActive())
-            doMouseEvent (getCurrentMousePos(), MouseInputSource::invalidPressure);
+            doMouseEvent (getCurrentMousePos(), MouseInputSource::defaultPressure);
     }
 
     ComponentPeer* findPeerUnderMouse (Point<float>& localPos)
@@ -2893,7 +3018,7 @@ private:
     }
 
     bool handleTouchInput (const TOUCHINPUT& touch, const bool isDown, const bool isUp,
-                           const float touchPressure = MouseInputSource::invalidPressure,
+                           const float touchPressure = MouseInputSource::defaultPressure,
                            const float orientation = 0.0f)
     {
         auto isCancel = false;
@@ -2970,9 +3095,9 @@ private:
                 return false;
 
             const auto pressure = touchInfo.touchMask & TOUCH_MASK_PRESSURE ? static_cast<float> (touchInfo.pressure)
-                                                                            : MouseInputSource::invalidPressure;
+                                                                            : MouseInputSource::defaultPressure;
             const auto orientation = touchInfo.touchMask & TOUCH_MASK_ORIENTATION ? degreesToRadians (static_cast<float> (touchInfo.orientation))
-                                                                                  : MouseInputSource::invalidOrientation;
+                                                                                  : MouseInputSource::defaultOrientation;
 
             if (! handleTouchInput (emulateTouchEventFromPointer (touchInfo.pointerInfo.ptPixelLocationRaw, wParam),
                                     isDown, isUp, pressure, orientation))
@@ -2985,7 +3110,7 @@ private:
             if (! getPointerPenInfo (GET_POINTERID_WPARAM (wParam), &penInfo))
                 return false;
 
-            const auto pressure = (penInfo.penMask & PEN_MASK_PRESSURE) ? (float) penInfo.pressure / 1024.0f : MouseInputSource::invalidPressure;
+            const auto pressure = (penInfo.penMask & PEN_MASK_PRESSURE) ? (float) penInfo.pressure / 1024.0f : MouseInputSource::defaultPressure;
 
             if (! handlePenInput (penInfo, globalToLocal (convertPhysicalScreenPointToLogical (pointFromPOINT (getPOINTFromLParam (lParam)), hwnd).toFloat()),
                                   pressure, isDown, isUp))
@@ -3016,9 +3141,9 @@ private:
         ModifierKeys modsToSend (ModifierKeys::currentModifiers);
         PenDetails penDetails;
 
-        penDetails.rotation = (penInfo.penMask & PEN_MASK_ROTATION) ? degreesToRadians (static_cast<float> (penInfo.rotation)) : MouseInputSource::invalidRotation;
-        penDetails.tiltX = (penInfo.penMask & PEN_MASK_TILT_X) ? (float) penInfo.tiltX / 90.0f : MouseInputSource::invalidTiltX;
-        penDetails.tiltY = (penInfo.penMask & PEN_MASK_TILT_Y) ? (float) penInfo.tiltY / 90.0f : MouseInputSource::invalidTiltY;
+        penDetails.rotation = (penInfo.penMask & PEN_MASK_ROTATION) ? degreesToRadians (static_cast<float> (penInfo.rotation)) : MouseInputSource::defaultRotation;
+        penDetails.tiltX = (penInfo.penMask & PEN_MASK_TILT_X) ? (float) penInfo.tiltX / 90.0f : MouseInputSource::defaultTiltX;
+        penDetails.tiltY = (penInfo.penMask & PEN_MASK_TILT_Y) ? (float) penInfo.tiltY / 90.0f : MouseInputSource::defaultTiltY;
 
         auto pInfoFlags = penInfo.pointerInfo.pointerFlags;
 
@@ -3033,7 +3158,7 @@ private:
 
             // this forces a mouse-enter/up event, in case for some reason we didn't get a mouse-up before.
             handleMouseEvent (MouseInputSource::InputSourceType::pen, pos, modsToSend.withoutMouseButtons(),
-                              pressure, MouseInputSource::invalidOrientation, time, penDetails);
+                              pressure, MouseInputSource::defaultOrientation, time, penDetails);
 
             if (! isValidPeer (this)) // (in case this component was deleted by the event)
                 return false;
@@ -3045,7 +3170,7 @@ private:
         }
 
         handleMouseEvent (MouseInputSource::InputSourceType::pen, pos, modsToSend, pressure,
-                          MouseInputSource::invalidOrientation, time, penDetails);
+                          MouseInputSource::defaultOrientation, time, penDetails);
 
         if (! isValidPeer (this)) // (in case this component was deleted by the event)
             return false;
@@ -3053,7 +3178,7 @@ private:
         if (isUp)
         {
             handleMouseEvent (MouseInputSource::InputSourceType::pen, MouseInputSource::offscreenMousePos, ModifierKeys::currentModifiers,
-                              pressure, MouseInputSource::invalidOrientation, time, penDetails);
+                              pressure, MouseInputSource::defaultOrientation, time, penDetails);
 
             if (! isValidPeer (this))
                 return false;
@@ -3304,7 +3429,7 @@ private:
 
     LRESULT handlePositionChanging (WINDOWPOS& wp)
     {
-        if (isConstrainedNativeWindow())
+        if (isConstrainedNativeWindow() && ! isFullScreen())
         {
             if ((wp.flags & (SWP_NOMOVE | SWP_NOSIZE)) != (SWP_NOMOVE | SWP_NOSIZE)
                  && (wp.x > -32000 && wp.y > -32000)
@@ -3350,8 +3475,10 @@ private:
 
         if (contains (pos.roundToInt(), false))
         {
+            const ScopedValueSetter<bool> scope (inHandlePositionChanged, true);
+
             if (! areOtherTouchSourcesActive())
-                doMouseEvent (pos, MouseInputSource::invalidPressure);
+                doMouseEvent (pos, MouseInputSource::defaultPressure);
 
             if (! isValidPeer (this))
                 return true;
@@ -3359,89 +3486,54 @@ private:
 
         handleMovedOrResized();
 
-        return ! dontRepaint; // to allow non-accelerated openGL windows to draw themselves correctly..
+        return ! dontRepaint; // to allow non-accelerated openGL windows to draw themselves correctly.
     }
 
     //==============================================================================
-    struct ChildWindowCallbackData
-    {
-        std::map<HWND, RECT> windowRectsMap;
-        float scaleRatio;
-    };
-
     LRESULT handleDPIChanging (int newDPI, RECT newRect)
     {
+        // Sometimes, windows that should not be automatically scaled (secondary windows in plugins)
+        // are sent WM_DPICHANGED. The size suggested by the OS is incorrect for our unscaled
+        // window, so we should ignore it.
+        if (! isPerMonitorDPIAwareWindow (hwnd))
+            return 0;
+
         const auto newScale = (double) newDPI / USER_DEFAULT_SCREEN_DPI;
 
         if (approximatelyEqual (scaleFactor, newScale))
             return 0;
 
-        const auto oldScale = std::exchange (scaleFactor, newScale);
+        scaleFactor = newScale;
 
         {
-            const ScopedValueSetter<int> setter (numInDpiChange, numInDpiChange + 1);
-            setBounds (windowBorder.subtractedFrom (convertPhysicalScreenRectangleToLogical (rectangleFromRECT (newRect), hwnd)), fullScreen);
+            const ScopedValueSetter<bool> setter (inDpiChange, true);
+            SetWindowPos (hwnd,
+                          nullptr,
+                          newRect.left,
+                          newRect.top,
+                          newRect.right  - newRect.left,
+                          newRect.bottom - newRect.top,
+                          SWP_NOZORDER | SWP_NOACTIVATE);
         }
 
         // This is to handle reentrancy. If responding to a DPI change triggers further DPI changes,
         // we should only notify listeners and resize windows once all of the DPI changes have
         // resolved.
-        if (numInDpiChange != 0)
-            return 0;
-
-        updateShadower();
-        InvalidateRect (hwnd, nullptr, FALSE);
-
-        ChildWindowCallbackData callbackData;
-        callbackData.scaleRatio = (float) (scaleFactor / oldScale);
-
-        EnumChildWindows (hwnd, getChildWindowRectCallback, (LPARAM) &callbackData);
-        scaleFactorListeners.call ([this] (ScaleFactorListener& l) { l.nativeScaleFactorChanged (scaleFactor); });
-        EnumChildWindows (hwnd, scaleChildWindowCallback, (LPARAM) &callbackData);
-
-        return 0;
-    }
-
-    static BOOL CALLBACK getChildWindowRectCallback (HWND hwnd, LPARAM data)
-    {
-        auto& callbackData = *(reinterpret_cast<ChildWindowCallbackData*> (data));
-
-        callbackData.windowRectsMap[hwnd] = getWindowClientRect (hwnd);
-        return TRUE;
-    }
-
-    static BOOL CALLBACK scaleChildWindowCallback (HWND hwnd, LPARAM data)
-    {
-        auto& callbackData = *(reinterpret_cast<ChildWindowCallbackData*> (data));
-
-        auto originalBounds = rectangleFromRECT (callbackData.windowRectsMap[hwnd]);
-        auto scaledBounds = (originalBounds.toFloat() * callbackData.scaleRatio).toNearestInt();
-        auto currentBounds = rectangleFromRECT (getWindowClientRect (hwnd));
-
-        if (scaledBounds != currentBounds)
+        if (inDpiChange)
         {
-            SetWindowPos (hwnd,
-                          nullptr,
-                          scaledBounds.getX(),
-                          scaledBounds.getY(),
-                          scaledBounds.getWidth(),
-                          scaledBounds.getHeight(),
-                          SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER);
+            // Danger! Re-entrant call to handleDPIChanging.
+            // Please report this issue on the JUCE forum, along with instructions
+            // so that a JUCE developer can reproduce the issue.
+            jassertfalse;
+            return 0;
         }
 
-        if (auto* peer = getOwnerOfWindow (hwnd))
-            peer->handleChildDPIChanging();
-
-        return TRUE;
-    }
-
-    void handleChildDPIChanging()
-    {
-        scaleFactor = getScaleFactorForWindow (parentToAddTo);
-        scaleFactorListeners.call ([&] (ScaleFactorListener& l) { l.nativeScaleFactorChanged (scaleFactor); });
-
         updateShadower();
         InvalidateRect (hwnd, nullptr, FALSE);
+
+        scaleFactorListeners.call ([this] (ScaleFactorListener& l) { l.nativeScaleFactorChanged (scaleFactor); });
+
+        return 0;
     }
 
     //==============================================================================
@@ -3771,6 +3863,12 @@ private:
                 }
 
                 handleFocusLoss();
+
+                if (auto* modal = Component::getCurrentlyModalComponent())
+                    if (auto* peer = modal->getPeer())
+                        if ((peer->getStyleFlags() & ComponentPeer::windowIsTemporary) != 0)
+                            sendInputAttemptWhenModalMessage();
+
                 break;
 
             case WM_ACTIVATEAPP:
@@ -3985,7 +4083,9 @@ private:
             return false;
 
         if (auto* current = Component::getCurrentlyModalComponent())
-            current->inputAttemptWhenModal();
+            if (auto* owner = getOwnerOfWindow ((HWND) current->getWindowHandle()))
+                if (! owner->shouldIgnoreModalDismiss)
+                    current->inputAttemptWhenModal();
 
         return true;
     }
@@ -4478,8 +4578,8 @@ class PreVistaMessageBox  : public WindowsMessageBoxBase
 public:
     PreVistaMessageBox (const MessageBoxOptions& opts,
                         UINT extraFlags,
-                        std::unique_ptr<ModalComponentManager::Callback>&& callback)
-        : WindowsMessageBoxBase (opts.getAssociatedComponent(), std::move (callback)),
+                        std::unique_ptr<ModalComponentManager::Callback>&& cb)
+        : WindowsMessageBoxBase (opts.getAssociatedComponent(), std::move (cb)),
           flags (extraFlags | getMessageBoxFlags (opts.getIconType())),
           title (opts.getTitle()), message (opts.getMessage())
     {
@@ -4531,8 +4631,8 @@ class WindowsTaskDialog  : public WindowsMessageBoxBase
 {
 public:
     WindowsTaskDialog (const MessageBoxOptions& opts,
-                       std::unique_ptr<ModalComponentManager::Callback>&& callback)
-        : WindowsMessageBoxBase (opts.getAssociatedComponent(), std::move (callback)),
+                       std::unique_ptr<ModalComponentManager::Callback>&& cb)
+        : WindowsMessageBoxBase (opts.getAssociatedComponent(), std::move (cb)),
           iconType (opts.getIconType()),
           title (opts.getTitle()), message (opts.getMessage()),
           button1 (opts.getButtonText (0)), button2 (opts.getButtonText (1)), button3 (opts.getButtonText (2))
@@ -4541,9 +4641,10 @@ public:
 
     int getResult() override
     {
-        TASKDIALOGCONFIG config = { 0 };
+        TASKDIALOGCONFIG config{};
 
         config.cbSize         = sizeof (config);
+        config.hwndParent     = getParentHWND();
         config.pszWindowTitle = title.toWideCharPointer();
         config.pszContent     = message.toWideCharPointer();
         config.hInstance      = (HINSTANCE) Process::getCurrentModuleInstanceHandle();
@@ -5087,128 +5188,206 @@ Image juce_createIconForFile (const File& file)
 }
 
 //==============================================================================
-void* CustomMouseCursorInfo::create() const
+class MouseCursor::PlatformSpecificHandle
 {
-    const int maxW = GetSystemMetrics (SM_CXCURSOR);
-    const int maxH = GetSystemMetrics (SM_CYCURSOR);
+public:
+    explicit PlatformSpecificHandle (const MouseCursor::StandardCursorType type)
+        : impl (makeHandle (type)) {}
 
-    Image im (image);
-    int hotspotX = hotspot.x;
-    int hotspotY = hotspot.y;
+    explicit PlatformSpecificHandle (const CustomMouseCursorInfo& info)
+        : impl (makeHandle (info)) {}
 
-    if (im.getWidth() > maxW || im.getHeight() > maxH)
+    static void showInWindow (PlatformSpecificHandle* handle, ComponentPeer* peer)
     {
-        im = im.rescaled (maxW, maxH);
+        SetCursor ([&]
+        {
+            if (handle != nullptr && handle->impl != nullptr && peer != nullptr)
+                return handle->impl->getCursor (*peer);
 
-        hotspotX = (hotspotX * maxW) / juce::jmax (1, image.getWidth());
-        hotspotY = (hotspotY * maxH) / juce::jmax (1, image.getHeight());
+            return LoadCursor (nullptr, IDC_ARROW);
+        }());
     }
 
-    return IconConverters::createHICONFromImage (im, FALSE, hotspotX, hotspotY);
-}
-
-void MouseCursor::deleteMouseCursor (void* cursorHandle, bool isStandard)
-{
-    if (cursorHandle != nullptr && ! isStandard)
-        DestroyCursor ((HCURSOR) cursorHandle);
-}
-
-enum
-{
-    hiddenMouseCursorHandle = 32500 // (arbitrary non-zero value to mark this type of cursor)
-};
-
-void* MouseCursor::createStandardMouseCursor (const MouseCursor::StandardCursorType type)
-{
-    LPCTSTR cursorName = IDC_ARROW;
-
-    switch (type)
+private:
+    struct Impl
     {
-        case NormalCursor:
-        case ParentCursor:                  break;
-        case NoCursor:                      return (void*) hiddenMouseCursorHandle;
-        case WaitCursor:                    cursorName = IDC_WAIT; break;
-        case IBeamCursor:                   cursorName = IDC_IBEAM; break;
-        case PointingHandCursor:            cursorName = MAKEINTRESOURCE(32649); break;
-        case CrosshairCursor:               cursorName = IDC_CROSS; break;
+        virtual ~Impl() = default;
+        virtual HCURSOR getCursor (ComponentPeer&) = 0;
+    };
 
-        case LeftRightResizeCursor:
-        case LeftEdgeResizeCursor:
-        case RightEdgeResizeCursor:         cursorName = IDC_SIZEWE; break;
+    class BuiltinImpl : public Impl
+    {
+    public:
+        explicit BuiltinImpl (HCURSOR cursorIn)
+            : cursor (cursorIn) {}
 
-        case UpDownResizeCursor:
-        case TopEdgeResizeCursor:
-        case BottomEdgeResizeCursor:        cursorName = IDC_SIZENS; break;
+        HCURSOR getCursor (ComponentPeer&) override { return cursor; }
 
-        case TopLeftCornerResizeCursor:
-        case BottomRightCornerResizeCursor: cursorName = IDC_SIZENWSE; break;
+    private:
+        HCURSOR cursor;
+    };
 
-        case TopRightCornerResizeCursor:
-        case BottomLeftCornerResizeCursor:  cursorName = IDC_SIZENESW; break;
+    class ImageImpl : public Impl
+    {
+    public:
+        explicit ImageImpl (const CustomMouseCursorInfo& infoIn) : info (infoIn) {}
 
-        case UpDownLeftRightResizeCursor:   cursorName = IDC_SIZEALL; break;
-
-        case DraggingHandCursor:
+        ~ImageImpl() override
         {
-            static void* dragHandCursor = nullptr;
+            for (auto& pair : cursorsBySize)
+                DestroyCursor (pair.second);
+        }
 
-            if (dragHandCursor == nullptr)
+        HCURSOR getCursor (ComponentPeer& peer) override
+        {
+            JUCE_ASSERT_MESSAGE_THREAD;
+
+            static auto getCursorSize = getCursorSizeForPeerFunction();
+
+            const auto size = getCursorSize (peer);
+            const auto iter = cursorsBySize.find (size);
+
+            if (iter != cursorsBySize.end())
+                return iter->second;
+
+            const auto logicalSize = info.image.getScaledBounds();
+            const auto scale = (float) size / (float) unityCursorSize;
+            const auto physicalSize = logicalSize * scale;
+
+            const auto& image = info.image.getImage();
+            const auto rescaled = image.rescaled (roundToInt ((float) physicalSize.getWidth()),
+                                                  roundToInt ((float) physicalSize.getHeight()));
+
+            const auto effectiveScale = rescaled.getWidth() / logicalSize.getWidth();
+
+            const auto hx = jlimit (0, rescaled.getWidth(),  roundToInt ((float) info.hotspot.x * effectiveScale));
+            const auto hy = jlimit (0, rescaled.getHeight(), roundToInt ((float) info.hotspot.y * effectiveScale));
+
+            return cursorsBySize.emplace (size, IconConverters::createHICONFromImage (rescaled, false, hx, hy)).first->second;
+        }
+
+    private:
+        const CustomMouseCursorInfo info;
+        std::map<int, HCURSOR> cursorsBySize;
+    };
+
+    static auto getCursorSizeForPeerFunction() -> int (*) (ComponentPeer&)
+    {
+        static const auto getDpiForMonitor = []() -> GetDPIForMonitorFunc
+        {
+            constexpr auto library = "SHCore.dll";
+            LoadLibraryA (library);
+
+            if (auto* handle = GetModuleHandleA (library))
+                return (GetDPIForMonitorFunc) GetProcAddress (handle, "GetDpiForMonitor");
+
+            return nullptr;
+        }();
+
+        static const auto getSystemMetricsForDpi = []() -> GetSystemMetricsForDpiFunc
+        {
+            constexpr auto library = "User32.dll";
+            LoadLibraryA (library);
+
+            if (auto* handle = GetModuleHandleA (library))
+                return (GetSystemMetricsForDpiFunc) GetProcAddress (handle, "GetSystemMetricsForDpi");
+
+            return nullptr;
+        }();
+
+        if (getDpiForMonitor == nullptr || getSystemMetricsForDpi == nullptr)
+            return [] (ComponentPeer&) { return unityCursorSize; };
+
+        return [] (ComponentPeer& p)
+        {
+            const ScopedThreadDPIAwarenessSetter threadDpiAwarenessSetter { p.getNativeHandle() };
+
+            UINT dpiX = 0, dpiY = 0;
+
+            if (auto* monitor = MonitorFromWindow ((HWND) p.getNativeHandle(), MONITOR_DEFAULTTONULL))
+                if (SUCCEEDED (getDpiForMonitor (monitor, MDT_Default, &dpiX, &dpiY)))
+                    return getSystemMetricsForDpi (SM_CXCURSOR, dpiX);
+
+            return unityCursorSize;
+        };
+    }
+
+    static constexpr auto unityCursorSize = 32;
+
+    static std::unique_ptr<Impl> makeHandle (const CustomMouseCursorInfo& info)
+    {
+        return std::make_unique<ImageImpl> (info);
+    }
+
+    static std::unique_ptr<Impl> makeHandle (const MouseCursor::StandardCursorType type)
+    {
+        LPCTSTR cursorName = IDC_ARROW;
+
+        switch (type)
+        {
+            case NormalCursor:
+            case ParentCursor:                  break;
+            case NoCursor:                      return std::make_unique<BuiltinImpl> (nullptr);
+            case WaitCursor:                    cursorName = IDC_WAIT; break;
+            case IBeamCursor:                   cursorName = IDC_IBEAM; break;
+            case PointingHandCursor:            cursorName = MAKEINTRESOURCE(32649); break;
+            case CrosshairCursor:               cursorName = IDC_CROSS; break;
+
+            case LeftRightResizeCursor:
+            case LeftEdgeResizeCursor:
+            case RightEdgeResizeCursor:         cursorName = IDC_SIZEWE; break;
+
+            case UpDownResizeCursor:
+            case TopEdgeResizeCursor:
+            case BottomEdgeResizeCursor:        cursorName = IDC_SIZENS; break;
+
+            case TopLeftCornerResizeCursor:
+            case BottomRightCornerResizeCursor: cursorName = IDC_SIZENWSE; break;
+
+            case TopRightCornerResizeCursor:
+            case BottomLeftCornerResizeCursor:  cursorName = IDC_SIZENESW; break;
+
+            case UpDownLeftRightResizeCursor:   cursorName = IDC_SIZEALL; break;
+
+            case DraggingHandCursor:
             {
-                static const unsigned char dragHandData[] =
+                static const unsigned char dragHandData[]
                     { 71,73,70,56,57,97,16,0,16,0,145,2,0,0,0,0,255,255,255,0,0,0,0,0,0,33,249,4,1,0,0,2,0,44,0,0,0,0,16,0,
                       16,0,0,2,52,148,47,0,200,185,16,130,90,12,74,139,107,84,123,39,132,117,151,116,132,146,248,60,209,138,
                       98,22,203,114,34,236,37,52,77,217,247,154,191,119,110,240,193,128,193,95,163,56,60,234,98,135,2,0,59 };
 
-                dragHandCursor = CustomMouseCursorInfo (ImageFileFormat::loadFrom (dragHandData, sizeof (dragHandData)), { 8, 7 }).create();
+                return makeHandle ({ ScaledImage (ImageFileFormat::loadFrom (dragHandData, sizeof (dragHandData))), { 8, 7 } });
             }
 
-            return dragHandCursor;
-        }
-
-        case CopyingCursor:
-        {
-            static void* copyCursor = nullptr;
-
-            if (copyCursor == nullptr)
+            case CopyingCursor:
             {
-                static unsigned char copyCursorData[] = {
-                    71,73,70,56,57,97,21,0,21,0,145,0,0,0,0,0,255,255,255,0,128,128,255,255,255,33,249,4,1,0,0,3,0,44,0,0,0,0,21,0,
-                    21,0,0,2,72,4,134,169,171,16,199,98,11,79,90,71,161,93,56,111,78,133,218,215,137,31,82,154,100,200,86,91,202,142,
-                    12,108,212,87,235,174, 15,54,214,126,237,226,37,96,59,141,16,37,18,201,142,157,230,204,51,112,252,114,147,74,83,
-                    5,50,68,147,208,217,16,71,149,252,124,5,0,59,0,0
-                };
-                const int copyCursorSize = 119;
+                static const unsigned char copyCursorData[]
+                    { 71,73,70,56,57,97,21,0,21,0,145,0,0,0,0,0,255,255,255,0,128,128,255,255,255,33,249,4,1,0,0,3,0,44,0,0,0,0,21,0,
+                      21,0,0,2,72,4,134,169,171,16,199,98,11,79,90,71,161,93,56,111,78,133,218,215,137,31,82,154,100,200,86,91,202,142,
+                      12,108,212,87,235,174, 15,54,214,126,237,226,37,96,59,141,16,37,18,201,142,157,230,204,51,112,252,114,147,74,83,
+                      5,50,68,147,208,217,16,71,149,252,124,5,0,59,0,0 };
 
-                copyCursor = CustomMouseCursorInfo (ImageFileFormat::loadFrom (copyCursorData, copyCursorSize), { 1, 3 }).create();
+                return makeHandle ({ ScaledImage (ImageFileFormat::loadFrom (copyCursorData, sizeof (copyCursorData))), { 1, 3 } });
             }
 
-            return copyCursor;
+            case NumStandardCursorTypes: JUCE_FALLTHROUGH
+            default:
+                jassertfalse; break;
         }
 
-        case NumStandardCursorTypes: JUCE_FALLTHROUGH
-        default:
-            jassertfalse; break;
+        return std::make_unique<BuiltinImpl> ([&]
+        {
+            if (auto* c = LoadCursor (nullptr, cursorName))
+                return c;
+
+            return LoadCursor (nullptr, IDC_ARROW);
+        }());
     }
 
-    if (auto cursorH = LoadCursor (nullptr, cursorName))
-        return cursorH;
-
-    return LoadCursor (nullptr, IDC_ARROW);
-}
+    std::unique_ptr<Impl> impl;
+};
 
 //==============================================================================
-void MouseCursor::showInWindow (ComponentPeer*) const
-{
-    auto c = (HCURSOR) getHandle();
-
-    if (c == nullptr)
-        c = LoadCursor (nullptr, IDC_ARROW);
-    else if (c == (HCURSOR) hiddenMouseCursorHandle)
-        c = nullptr;
-
-    SetCursor (c);
-}
-
 JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
 } // namespace juce
