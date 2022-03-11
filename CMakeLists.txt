@@ -103,6 +103,14 @@ endif()
 option(JUCE_BUILD_EXAMPLES "Add build targets for the DemoRunner and PIPs" OFF)
 
 if(JUCE_BUILD_EXAMPLES)
+    if (EMSCRIPTEN)
+        add_link_options(
+			    "--emrun" 
+			    "--enable-features=SharedArrayBuffer" 
+			    "-sEXPORTED_FUNCTIONS=['_main', '_juce_mouseCallback', '_juce_keyboardCallback', '_juce_animationFrameCallback']"
+                "-sEXPORTED_RUNTIME_METHODS=['cwrap']"
+                )
+    endif ()
     add_subdirectory(examples)
 endif()
 

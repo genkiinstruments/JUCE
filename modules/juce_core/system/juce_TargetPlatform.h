@@ -79,8 +79,7 @@
   #endif
 #elif defined (__wasm__)
   #define       JUCE_WASM 1
-#elif defined (AUDIOWORKLET)
-  #define       JUCE_AUDIOWORKLET 1
+  #define       JUCE_EMSCRIPTEN 1
 #else
   #error "Unknown platform!"
 #endif

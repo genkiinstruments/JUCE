@@ -72,17 +72,7 @@
   #include <netinet/in.h>
  #endif
 
- #if JUCE_WASM
-  #include <stdio.h>
-  #include <sys/types.h>
-  #include <sys/socket.h>
-  #include <errno.h>
-  #include <unistd.h>
-  #include <netinet/in.h>
-  #include <sys/stat.h>
- #endif
-
- #if JUCE_LINUX || JUCE_BSD
+ #if JUCE_LINUX || JUCE_BSD || JUCE_EMSCRIPTEN
   #include <stdio.h>
   #include <langinfo.h>
   #include <ifaddrs.h>
@@ -102,8 +92,13 @@
  #include <net/if.h>
  #include <sys/ioctl.h>
 
- #if ! (JUCE_ANDROID || JUCE_WASM || JUCE_AUDIOWORKLET)
+ #if ! (JUCE_ANDROID || JUCE_EMSCRIPTEN)
   #include <execinfo.h>
+ #endif
+
+ #if JUCE_EMSCRIPTEN
+  #include <signal.h>
+  #include <unistd.h>
  #endif
 #endif
 
@@ -151,12 +146,10 @@
 #include "misc/juce_Result.cpp"
 #include "misc/juce_Uuid.cpp"
 #include "misc/juce_ConsoleApplication.cpp"
-#ifndef JUCE_AUDIOWORKLET
 #include "network/juce_MACAddress.cpp"
 #include "network/juce_NamedPipe.cpp"
 #include "network/juce_Socket.cpp"
 #include "network/juce_IPAddress.cpp"
-#endif
 #include "streams/juce_BufferedInputStream.cpp"
 #include "streams/juce_FileInputSource.cpp"
 #include "streams/juce_InputStream.cpp"
@@ -174,12 +167,10 @@
 #include "text/juce_StringPool.cpp"
 #include "text/juce_TextDiff.cpp"
 #include "text/juce_Base64.cpp"
-#ifndef JUCE_AUDIOWORKLET
 #include "threads/juce_ReadWriteLock.cpp"
 #include "threads/juce_Thread.cpp"
 #include "threads/juce_ThreadPool.cpp"
 #include "threads/juce_TimeSliceThread.cpp"
-#endif
 #include "time/juce_PerformanceCounter.cpp"
 #include "time/juce_RelativeTime.cpp"
 #include "time/juce_Time.cpp"
@@ -197,7 +188,7 @@
 #include "files/juce_WildcardFileFilter.cpp"
 
 //==============================================================================
-#if ! (JUCE_WINDOWS || JUCE_AUDIOWORKLET)
+#if !JUCE_WINDOWS
  #include "native/juce_posix_SharedCode.h"
  #include "native/juce_posix_NamedPipe.cpp"
  #if ! JUCE_ANDROID || __ANDROID_API__ >= 24
@@ -223,7 +214,7 @@
  #include "native/juce_win32_Threads.cpp"
 
 //==============================================================================
-#elif JUCE_LINUX || JUCE_BSD
+#elif JUCE_LINUX || JUCE_BSD || JUCE_EMSCRIPTEN
  #include "native/juce_linux_CommonFile.cpp"
  #include "native/juce_linux_Files.cpp"
  #include "native/juce_linux_Network.cpp"
@@ -233,7 +224,11 @@
  #if JUCE_BSD
   #include "native/juce_intel_SharedCode.h"
  #endif
- #include "native/juce_linux_SystemStats.cpp"
+ #if JUCE_EMSCRIPTEN
+  #include "native/juce_wasm_SystemStats.cpp"
+ #else
+  #include "native/juce_linux_SystemStats.cpp"
+ #endif
  #include "native/juce_linux_Threads.cpp"
 
 //==============================================================================
@@ -246,22 +241,14 @@
  #include "native/juce_android_SystemStats.cpp"
  #include "native/juce_android_Threads.cpp"
  #include "native/juce_android_RuntimePermissions.cpp"
-
-#elif JUCE_WASM
- #include "native/juce_wasm_SystemStats.cpp"
-
 #endif
 
-// TODO: These three were previously removed for JUCE_AUDIOWORKLET
+#include "threads/juce_ChildProcess.cpp"
 #include "threads/juce_HighResolutionTimer.cpp"
 #include "threads/juce_WaitableEvent.cpp"
 #include "network/juce_URL.cpp"
-
-#if ! (JUCE_WASM || JUCE_AUDIOWORKLET)
- #include "threads/juce_ChildProcess.cpp"
- #include "network/juce_WebInputStream.cpp"
- #include "streams/juce_URLInputSource.cpp"
-#endif
+#include "network/juce_WebInputStream.cpp"
+#include "streams/juce_URLInputSource.cpp"
 
 //==============================================================================
 #if JUCE_UNIT_TESTS

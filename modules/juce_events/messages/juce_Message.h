@@ -61,4 +61,12 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Message)
 };
 
+#if JUCE_EMSCRIPTEN
+/** Mouse and keyboard events posted from the main thread.
+
+    @tags{Events}
+*/
+class JUCE_API EmscriptenEventMessage : public Message {};
+#endif
+
 } // namespace juce

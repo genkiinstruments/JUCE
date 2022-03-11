@@ -23,7 +23,7 @@
 namespace juce
 {
 
-#if ! JUCE_WASM
+#if ! JUCE_EMSCRIPTEN
 
 class NamedPipe::Pimpl
 {

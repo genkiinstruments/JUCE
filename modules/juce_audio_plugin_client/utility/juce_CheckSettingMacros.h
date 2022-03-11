@@ -74,6 +74,11 @@
  #define JucePlugin_Build_RTAS 0
 #endif
 
+#if JUCE_EMSCRIPTEN
+ #undef JucePlugin_Build_VST
+ #define JucePlugin_Build_VST 0
+#endif
+
 //==============================================================================
 #if JucePlugin_Build_LV2 && ! defined (JucePlugin_LV2URI)
  #error "You need to define the JucePlugin_LV2URI value!"

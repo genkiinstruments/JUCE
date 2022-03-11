@@ -138,7 +138,11 @@
     If you disable this then https/ssl support will not be available on Linux.
 */
 #ifndef JUCE_USE_CURL
- #define JUCE_USE_CURL 1
+ #ifdef JUCE_EMSCRIPTEN
+  #define JUCE_USE_CURL 0
+ #else
+  #define JUCE_USE_CURL 1
+ #endif
 #endif
 
 /** Config: JUCE_LOAD_CURL_SYMBOLS_LAZILY

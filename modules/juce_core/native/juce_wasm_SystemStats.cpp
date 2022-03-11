@@ -54,6 +54,7 @@ void CPUInformation::initialise() noexcept
 }
 
 //==============================================================================
+#include <emscripten.h>
 uint32 juce_millisecondsSinceStartup() noexcept
 {
     return static_cast<uint32> (emscripten_get_now());

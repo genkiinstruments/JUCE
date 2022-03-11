@@ -20,6 +20,10 @@
   ==============================================================================
 */
 
+#if JUCE_EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
 #if JUCE_BSD
 extern char** environ;
 #endif
@@ -199,6 +203,20 @@ static bool isFileExecutable (const String& filename)
 
 bool Process::openDocument (const String& fileName, const String& parameters)
 {
+#   if JUCE_EMSCRIPTEN
+    auto cmdString = fileName.replace(" ", "\\ ", false);
+    cmdString << " " << parameters;
+
+    MAIN_THREAD_EM_ASM({
+        var elem = window.document.createElement('a');
+        elem.href = UTF8ToString($0);
+        elem.target = "_blank";
+        document.body.appendChild(elem);
+        elem.click();
+        document.body.removeChild(elem);
+                       }, cmdString.toRawUTF8());
+    return true;
+#   else
     const auto cmdString = [&]
     {
         if (fileName.startsWithIgnoreCase ("file:")
@@ -235,6 +253,7 @@ bool Process::openDocument (const String& fileName, const String& parameters)
     }
 
     return cpid >= 0;
+#   endif
 }
 
 void File::revealToUser() const

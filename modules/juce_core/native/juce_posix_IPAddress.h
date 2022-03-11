@@ -36,7 +36,7 @@ namespace
             && lhs.broadcastAddress == rhs.broadcastAddress;
     }
 
-   #if ! JUCE_WASM
+   #if ! JUCE_EMSCRIPTEN
     static IPAddress makeAddress (const sockaddr_in6* addr_in)
     {
         if (addr_in == nullptr)
@@ -98,7 +98,7 @@ namespace
     {
         Array<InterfaceInfo> interfaces;
 
-       #if JUCE_WASM
+       #if JUCE_EMSCRIPTEN
         // TODO
        #else
         struct ifaddrs* ifaddr = nullptr;

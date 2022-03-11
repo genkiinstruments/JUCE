@@ -182,6 +182,14 @@
   #include <juce_audio_basics/midi/juce_MidiDataConcatenator.h>
   #include "native/juce_linux_Midi.cpp"
  #endif
+  //==============================================================================
+#elif JUCE_EMSCRIPTEN
+#include <emscripten.h>
+#include <AL/al.h>
+#include <AL/alc.h>
+
+//#include "native/juce_emscripten_Audio.cpp"
+//#include "native/juce_emscripten_Midi.cpp"
 
 //==============================================================================
 #elif JUCE_ANDROID

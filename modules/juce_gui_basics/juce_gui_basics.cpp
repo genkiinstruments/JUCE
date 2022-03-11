@@ -342,6 +342,10 @@ JUCE_END_IGNORE_WARNINGS_GCC_LIKE
   #include "native/juce_android_ContentSharer.cpp"
  #endif
 
+#elif JUCE_EMSCRIPTEN
+#include "native/juce_wasm_Windowing.cpp"
+#include "native/juce_wasm_FileChooser.cpp"
+
 #endif
 
 namespace juce

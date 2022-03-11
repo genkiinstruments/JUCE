@@ -304,7 +304,7 @@ PluginHostType::HostType PluginHostType::getHostType()
     if (hostFilename.startsWith           ("Bitwig"))            return BitwigStudio;
     if (hostFilename.containsIgnoreCase   ("pluginval"))         return pluginval;
     if (hostFilename.containsIgnoreCase   ("AudioPluginHost"))   return JUCEPluginHost;
-   #elif JUCE_AUDIOWORKLET
+   #elif JUCE_EMSCRIPTEN
     return AudioWorklet;
 
    #elif JUCE_IOS
