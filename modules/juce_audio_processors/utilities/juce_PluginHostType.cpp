@@ -153,6 +153,7 @@ const char* PluginHostType::getHostDescription() const noexcept
         case VBVSTScanner:             return "VBVSTScanner";
         case ViennaEnsemblePro:        return "Vienna Ensemble Pro";
         case WaveBurner:               return "WaveBurner";
+        case AudioWorklet:             return "AudioWorklet";
         case UnknownHost:
         default:                       break;
     }
@@ -303,6 +304,8 @@ PluginHostType::HostType PluginHostType::getHostType()
     if (hostFilename.startsWith           ("Bitwig"))            return BitwigStudio;
     if (hostFilename.containsIgnoreCase   ("pluginval"))         return pluginval;
     if (hostFilename.containsIgnoreCase   ("AudioPluginHost"))   return JUCEPluginHost;
+   #elif JUCE_AUDIOWORKLET
+    return AudioWorklet;
 
    #elif JUCE_IOS
    #elif JUCE_ANDROID

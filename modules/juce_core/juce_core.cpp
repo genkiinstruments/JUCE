@@ -102,7 +102,7 @@
  #include <net/if.h>
  #include <sys/ioctl.h>
 
- #if ! (JUCE_ANDROID || JUCE_WASM)
+ #if ! (JUCE_ANDROID || JUCE_WASM || JUCE_AUDIOWORKLET)
   #include <execinfo.h>
  #endif
 #endif
@@ -151,10 +151,12 @@
 #include "misc/juce_Result.cpp"
 #include "misc/juce_Uuid.cpp"
 #include "misc/juce_ConsoleApplication.cpp"
+#ifndef JUCE_AUDIOWORKLET
 #include "network/juce_MACAddress.cpp"
 #include "network/juce_NamedPipe.cpp"
 #include "network/juce_Socket.cpp"
 #include "network/juce_IPAddress.cpp"
+#endif
 #include "streams/juce_BufferedInputStream.cpp"
 #include "streams/juce_FileInputSource.cpp"
 #include "streams/juce_InputStream.cpp"
@@ -172,10 +174,12 @@
 #include "text/juce_StringPool.cpp"
 #include "text/juce_TextDiff.cpp"
 #include "text/juce_Base64.cpp"
+#ifndef JUCE_AUDIOWORKLET
 #include "threads/juce_ReadWriteLock.cpp"
 #include "threads/juce_Thread.cpp"
 #include "threads/juce_ThreadPool.cpp"
 #include "threads/juce_TimeSliceThread.cpp"
+#endif
 #include "time/juce_PerformanceCounter.cpp"
 #include "time/juce_RelativeTime.cpp"
 #include "time/juce_Time.cpp"
@@ -193,7 +197,7 @@
 #include "files/juce_WildcardFileFilter.cpp"
 
 //==============================================================================
-#if ! JUCE_WINDOWS
+#if ! (JUCE_WINDOWS || JUCE_AUDIOWORKLET)
  #include "native/juce_posix_SharedCode.h"
  #include "native/juce_posix_NamedPipe.cpp"
  #if ! JUCE_ANDROID || __ANDROID_API__ >= 24
@@ -248,11 +252,12 @@
 
 #endif
 
+// TODO: These three were previously removed for JUCE_AUDIOWORKLET
 #include "threads/juce_HighResolutionTimer.cpp"
 #include "threads/juce_WaitableEvent.cpp"
 #include "network/juce_URL.cpp"
 
-#if ! JUCE_WASM
+#if ! (JUCE_WASM || JUCE_AUDIOWORKLET)
  #include "threads/juce_ChildProcess.cpp"
  #include "network/juce_WebInputStream.cpp"
  #include "streams/juce_URLInputSource.cpp"
