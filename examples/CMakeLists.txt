@@ -55,3 +55,5 @@ add_subdirectory(DSP)
 add_subdirectory(GUI)
 add_subdirectory(Plugins)
 add_subdirectory(Utilities)
+
+add_subdirectory(Dreamtonics)
