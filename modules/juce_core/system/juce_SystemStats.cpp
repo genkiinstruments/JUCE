@@ -20,6 +20,10 @@
   ==============================================================================
 */
 
+#if JUCE_EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
 namespace juce
 {
 

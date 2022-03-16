@@ -86,7 +86,7 @@ void MessageManager::doPlatformSpecificInitialisation()
 
     appIsInsideEmrun = MAIN_THREAD_EM_ASM_INT({
         return document.title == "Emscripten-Generated Code";
-                                              });
+    });
 
     MAIN_THREAD_EM_ASM({
         if (window.juce_animationFrameCallback) return;
@@ -104,7 +104,7 @@ void MessageManager::doPlatformSpecificInitialisation()
 
             window.requestAnimationFrame(window.juce_animationFrameWrapper);
         }
-                       });
+    });
 }
 
 void MessageManager::doPlatformSpecificShutdown() {}
@@ -201,7 +201,7 @@ static void dispatchLoop()
             var n = logArea.value.length;
             if (n > 1000)
                 logArea.value = logArea.value.substring(n - 1000, n);
-                           });
+        });
     }
     // DBG("ending dispatch loop cycle");
 }

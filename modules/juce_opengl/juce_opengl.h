@@ -58,6 +58,8 @@
 
 #include <juce_core/system/juce_TargetPlatform.h>
 
+#if ! JUCE_EMSCRIPTEN
+
 #undef JUCE_OPENGL
 #define JUCE_OPENGL 1
 
@@ -118,3 +120,5 @@ namespace juce
 #include "opengl/juce_OpenGLShaderProgram.h"
 #include "opengl/juce_OpenGLTexture.h"
 #include "utils/juce_OpenGLAppComponent.h"
+
+#endif // JUCE_EMSCRIPTEN

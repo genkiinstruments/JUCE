@@ -23,8 +23,6 @@
 namespace juce
 {
 
-#if ! JUCE_WASM
-
 JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4127 4389 4018)
 
 #ifndef AI_NUMERICSERV  // (missing in older Mac SDKs)
@@ -130,7 +128,7 @@ namespace SocketHelpers
                 // a chance to process before close is called. On Mac OS X shutdown
                 // does not unblock a select call, so using a lock here will dead-lock
                 // both threads.
-               #if JUCE_LINUX || JUCE_BSD || JUCE_ANDROID
+               #if JUCE_LINUX || JUCE_BSD || JUCE_ANDROID || JUCE_EMSCRIPTEN
                 CriticalSection::ScopedLockType lock (readLock);
                 ::close (h);
                #else
@@ -778,7 +776,7 @@ bool DatagramSocket::setEnablePortReuse (bool enabled)
    #else
     if (handle >= 0)
         return SocketHelpers::setOption ((SocketHandle) handle.load(),
-                                        #if JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD
+                                        #if JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD || JUCE_EMSCRIPTEN
                                          SO_REUSEADDR,  // port re-use is implied by addr re-use on these platforms
                                         #else
                                          SO_REUSEPORT,
@@ -857,7 +855,6 @@ struct SocketTests : public UnitTest
 
 static SocketTests socketTests;
 
-#endif
 #endif
 
 } // namespace juce

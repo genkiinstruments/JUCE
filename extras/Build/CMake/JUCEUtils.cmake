@@ -481,16 +481,24 @@ function(juce_generate_juce_header target)
     endif()
 
     set(juce_header ${juce_library_code}/JuceHeader.h)
+
     target_sources(${target} PRIVATE ${juce_header})
 
     set(defs_file $<GENEX_EVAL:$<TARGET_PROPERTY:${target},JUCE_DEFS_FILE>>)
 
     set(extra_args)
 
-    add_custom_command(OUTPUT "${juce_header}"
-        COMMAND juce::juceaide header "${defs_file}" "${juce_header}" ${extra_args}
-        DEPENDS "${defs_file}"
-        VERBATIM)
+    if (EMSCRIPTEN)
+        add_custom_command(OUTPUT "${juce_header}" 
+            COMMAND ${CMAKE_COMMAND} -E copy "${JUCE_SOURCE_DIR}/extras/Build/CMake/DefaultJuceHeader.h" "${juce_header}"
+            DEPENDS "${defs_file}"
+            VERBATIM)
+    else ()
+        add_custom_command(OUTPUT "${juce_header}"
+            COMMAND juce::juceaide header "${defs_file}" "${juce_header}" ${extra_args}
+            DEPENDS "${defs_file}"
+            VERBATIM)
+    endif ()
 endfunction()
 
 # ==================================================================================================
@@ -1740,9 +1748,15 @@ function(juce_add_pip header)
 
     _juce_target_args_from_plugin_characteristics(extra_target_args ${pip_charateristics})
 
-    list(APPEND extra_target_args
-        NEEDS_CURL TRUE
-        NEEDS_WEB_BROWSER TRUE)
+    if (EMSCRIPTEN)
+        list(APPEND extra_target_args
+            NEEDS_CURL FALSE
+            NEEDS_WEB_BROWSER FALSE)
+    else ()
+        list(APPEND extra_target_args
+            NEEDS_CURL TRUE
+            NEEDS_WEB_BROWSER TRUE)
+    endif ()
 
     _juce_get_metadata("${metadata_dict}" moduleFlags pip_moduleflags)
 
@@ -1820,6 +1834,12 @@ function(juce_add_pip header)
         PRIVATE ${pip_moduleflags}
         PUBLIC
             JUCE_VST3_CAN_REPLACE_VST2=0)
+
+    if (EMSCRIPTEN)
+        target_compile_definitions(${JUCE_PIP_NAME} PUBLIC
+            JUCE_USE_CURL=0
+            JUCE_WEB_BROWSER=0)
+    endif ()
 
     _juce_get_pip_targets(${JUCE_PIP_NAME} pip_targets)
 

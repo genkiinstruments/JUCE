@@ -1076,6 +1076,18 @@ String SystemClipboard::getTextFromClipboard()
     return ret;
 }
 
+void JUCE_CALLTYPE NativeMessageBox::showAsync(const MessageBoxOptions& options,
+                                               ModalComponentManager::Callback* callback)
+{
+    // TODO
+}
+
+void JUCE_CALLTYPE NativeMessageBox::showAsync(const MessageBoxOptions& options,
+                                               std::function<void(int)> callback)
+{
+    // TODO
+}
+
 // TODO: make async
 void JUCE_CALLTYPE NativeMessageBox::showMessageBoxAsync (
     AlertWindow::AlertIconType iconType,

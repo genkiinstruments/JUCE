@@ -1,0 +1,102 @@
+﻿{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "windows-base",
+            "description": "Target Windows with the Visual Studio development environment.",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "x64-debug",
+            "displayName": "x64 Debug",
+            "description": "Target Windows (64-bit) with the Visual Studio development environment. (Debug)",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "JUCE_BUILD_EXAMPLES": true
+            }
+        },
+        {
+            "name": "x64-release",
+            "displayName": "x64 Release",
+            "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
+            "inherits": "x64-debug",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        },
+        {
+            "name": "linux-default",
+            "displayName": "Linux Debug",
+            "description": "Sets Ninja generator, compilers, build and install directory, debug build type",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "vendor": {
+                "microsoft.com/VisualStudioSettings/CMake/1.0": {
+                    "hostOS": [ "Linux" ]
+                },
+                "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
+                    "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}"
+                }
+            }
+        },
+
+
+        {
+            "name": "wasm-debug",
+            "displayName": "WASM Debug",
+            "toolchainFile": "${sourceDir}/emscripten.cmake",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "generator": "Unix Makefiles",
+            "environment": {
+                "EMCC_DEBUG": "1",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "LLVM_ROOT": "/usr/bin/",
+                "EMSDK": "$env{HOME}/emsdk",
+                "EM_CONFIG": "$env{EMSDK}/.emscripten",
+                "EMSCRIPTEN": "$env{EMSDK}/upstream/emscripten",
+                "EMSDK_NODE_BIN": "$env{EMSDK}/node/14.18.2_64bit/bin",
+                "EMSDK_NODE": "$env{EMSDK_NODE_BIN}/node",
+                "PATH": "$env{EMSDK}:$env{EMSCRIPTEN}:$env{EMSDK_NODE_BIN}:$penv{PATH}"
+            },
+            "cacheVariables": {
+                "CMAKE_VERBOSE_MAKEFILE": true,
+                "CMAKE_C_COMPILER": "$env{EMSCRIPTEN}/emcc",
+                "CMAKE_CXX_COMPILER": "$env{EMSCRIPTEN}/em++",
+                "CMAKE_AR": "$env{EMSCRIPTEN}/emar",
+                "CMAKE_RANLIB": "$env{EMSCRIPTEN}/emranlib",
+                "EMSCRIPTEN_OUTPUT_HTML": true,
+                "EMSCRIPTEN_FORCE_PTHREADS": true,
+                "JUCE_BUILD_EXAMPLES": true
+            },
+            "vendor": {
+                "microsoft.com/VisualStudioSettings/CMake/1.0": {
+                    "hostOS": [ "Linux" ]
+                },
+                "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
+                    "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}"
+                }
+            }
+        }
+
+    ]
+}

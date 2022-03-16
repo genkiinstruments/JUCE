@@ -23,7 +23,6 @@
   ==============================================================================
 */
 
-#include <JuceHeader.h>
 #include "../../../Assets/DemoUtilities.h"
 #include "JUCEDemos.h"
 

@@ -188,8 +188,8 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
-//#include "native/juce_emscripten_Audio.cpp"
-//#include "native/juce_emscripten_Midi.cpp"
+#include "native/juce_wasm_Audio.cpp"
+#include "native/juce_wasm_Midi.cpp"
 
 //==============================================================================
 #elif JUCE_ANDROID

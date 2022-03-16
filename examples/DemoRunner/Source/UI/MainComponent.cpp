@@ -448,11 +448,15 @@ void MainComponent::updateRenderingEngine (int renderingEngineIndex)
         if (isShowingHeavyweightDemo)
             return;
 
+       #if ! JUCE_EMSCRIPTEN
         openGLContext.attachTo (*getTopLevelComponent());
+       #endif
     }
     else
     {
+       #if ! JUCE_EMSCRIPTEN
         openGLContext.detach();
+       #endif
         peer->setCurrentRenderingEngine (renderingEngineIndex);
     }
 

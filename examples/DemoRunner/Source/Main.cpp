@@ -23,7 +23,6 @@
   ==============================================================================
 */
 
-#include <JuceHeader.h>
 #include "../../Assets/DemoUtilities.h"
 
 #include "UI/MainComponent.h"
@@ -87,8 +86,8 @@ public:
         sharedAudioDeviceManager.reset();
     }
 
-    const String getApplicationName() override       { return ProjectInfo::projectName; }
-    const String getApplicationVersion() override    { return ProjectInfo::versionString; }
+    const String getApplicationName() override       { return "DemoRunner"; }
+    const String getApplicationVersion() override    { return "0.0.1"; }
     bool moreThanOneInstanceAllowed() override       { return true; }
 
     //==============================================================================
@@ -125,8 +124,13 @@ private:
                                                           .findColour (ResizableWindow::backgroundColourId),
                               DocumentWindow::allButtons)
         {
+           #if JUCE_EMSCRIPTEN
+            setUsingNativeTitleBar(false);
+            setResizable(true, true);
+           #else
             setUsingNativeTitleBar (true);
-            setResizable (true, false);
+            setResizable(true, false);
+           #endif
             setResizeLimits (400, 400, 10000, 10000);
 
            #if JUCE_IOS || JUCE_ANDROID

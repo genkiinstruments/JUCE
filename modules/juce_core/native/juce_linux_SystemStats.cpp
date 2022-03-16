@@ -24,8 +24,19 @@
 extern "C" int cobalt_thread_mode();
 #endif
 
+#if JUCE_EMSCRIPTEN
+#include <emscripten.h>
+#include <emscripten/threading.h>
+#include <deque>
+#endif
+
 namespace juce
 {
+
+#if JUCE_EMSCRIPTEN
+std::deque<std::string> debugPrintQueue;
+std::mutex debugPrintQueueMtx;
+#endif
 
 #if ! JUCE_BSD
 static String getCpuInfo (const char* key)
@@ -45,7 +56,18 @@ static String getLocaleValue (nl_item key)
 //==============================================================================
 void Logger::outputDebugString (const String& text)
 {
+   #if JUCE_EMSCRIPTEN
+    if (Thread::getCurrentThread() == nullptr)
+        std::cerr << text << std::endl;
+    else
+    {
+        debugPrintQueueMtx.lock();
+        debugPrintQueue.push_back (text.toStdString());
+        debugPrintQueueMtx.unlock();
+    }
+   #else
     std::cerr << text << std::endl;
+   #endif
 }
 
 //==============================================================================
@@ -56,12 +78,25 @@ SystemStats::OperatingSystemType SystemStats::getOperatingSystemType()
 
 String SystemStats::getOperatingSystemName()
 {
+   #if JUCE_EMSCRIPTEN
+    char* str = (char*)MAIN_THREAD_EM_ASM_INT({
+        var userAgent = navigator.userAgent;
+        var lengthBytes = lengthBytesUTF8(userAgent) + 1;
+        var heapBytes = _malloc(lengthBytes);
+        stringToUTF8(userAgent, heapBytes, lengthBytes);
+        return heapBytes;
+    });
+    String ret(str);
+    free((void*)str);
+    return ret;
+   #else
     return "Linux";
+   #endif
 }
 
 bool SystemStats::isOperatingSystem64Bit()
 {
-   #if JUCE_64BIT
+   #if JUCE_64BIT && ! JUCE_EMSCRIPTEN
     return true;
    #else
     //xxx not sure how to find this out?..
@@ -86,6 +121,17 @@ String SystemStats::getDeviceDescription()
     MemoryBlock machineDescription { machineDescriptionLength };
     result = sysctl (mib, numElementsInArray (mib), machineDescription.getData(), &machineDescriptionLength, nullptr, 0);
     return String::fromUTF8 (result == 0 ? (char*) machineDescription.getData() : "");
+   #elif JUCE_EMSCRIPTEN
+    char* str = (char*)MAIN_THREAD_EM_ASM_INT({
+        var platform = navigator.platform;
+        var lengthBytes = lengthBytesUTF8(platform) + 1;
+        var heapBytes = _malloc(lengthBytes);
+        stringToUTF8(platform, heapBytes, lengthBytes);
+        return heapBytes;
+    });
+    String ret(str);
+    free((void*)str);
+    return ret;
    #else
     return getCpuInfo ("Hardware");
    #endif
@@ -93,13 +139,28 @@ String SystemStats::getDeviceDescription()
 
 String SystemStats::getDeviceManufacturer()
 {
+   #if JUCE_EMSCRIPTEN
+    char* str = (char*)MAIN_THREAD_EM_ASM_INT({
+        var vendor = navigator.vendor;
+        var lengthBytes = lengthBytesUTF8(vendor) + 1;
+        var heapBytes = _malloc(lengthBytes);
+        stringToUTF8(vendor, heapBytes, lengthBytes);
+        return heapBytes;
+    });
+    String ret(str);
+    free((void*)str);
+    return ret;
+   #else
     return {};
+   #endif
 }
 
 String SystemStats::getCpuVendor()
 {
    #if JUCE_BSD
     return {};
+   #elif JUCE_EMSCRIPTEN
+    return getDeviceManufacturer();
    #else
     auto v = getCpuInfo ("vendor_id");
 
@@ -126,6 +187,8 @@ String SystemStats::getCpuModel()
     MemoryBlock model { modelLength };
     result = sysctl (mib, numElementsInArray (mib), model.getData(), &modelLength, nullptr, 0);
     return String::fromUTF8 (result == 0 ? (char*) model.getData() : "");
+   #elif JUCE_EMSCRIPTEN
+    return "emscripten";
    #else
     return getCpuInfo ("model name");
    #endif
@@ -154,6 +217,14 @@ int SystemStats::getMemorySizeInMegabytes()
     auto memorySize = sizeof (memory);
     auto result = sysctl (mib, numElementsInArray (mib), &memory, &memorySize, nullptr, 0);
     return result == 0 ? (int) (memory / 1e6) : 0;
+   #elif JUCE_EMSCRIPTEN
+    int heapSizeLimit = MAIN_THREAD_EM_ASM_INT({
+        if (performance != undefined)
+            if (performance.memory != undefined)
+                return performance.memory.jsHeapSizeLimit / 1024 / 1024;
+        return 128; // some arbitrary number just to get things working (hopefully)
+    });
+    return heapSizeLimit;
    #else
     struct sysinfo sysi;
 
@@ -196,6 +267,31 @@ String SystemStats::getComputerName()
     return {};
 }
 
+#if JUCE_EMSCRIPTEN
+String SystemStats::getDisplayLanguage()
+{
+    char* str = (char*)MAIN_THREAD_EM_ASM_INT({
+        var language = navigator.language;
+        var lengthBytes = lengthBytesUTF8(language) + 1;
+        var heapBytes = _malloc(lengthBytes);
+        stringToUTF8(language, heapBytes, lengthBytes);
+        return heapBytes;
+    });
+    String ret(str);
+    free((void*)str);
+    return ret;
+}
+String SystemStats::getUserLanguage()
+{
+    String langRegion = getDisplayLanguage();
+    return langRegion.upToFirstOccurrenceOf("-", false, true);
+}
+String SystemStats::getUserRegion()
+{
+    String langRegion = getDisplayLanguage();
+    return langRegion.fromFirstOccurrenceOf("-", false, true);
+}
+#else
 String SystemStats::getUserLanguage()
 {
    #if JUCE_BSD
@@ -227,6 +323,7 @@ String SystemStats::getDisplayLanguage()
 
     return result;
 }
+#endif
 
 //==============================================================================
 void CPUInformation::initialise() noexcept
@@ -294,10 +391,15 @@ void CPUInformation::initialise() noexcept
     hasAVX512VL        = flags.contains ("avx512vl");
     hasAVX512VPOPCNTDQ = flags.contains ("avx512_vpopcntdq");
 
+   #if JUCE_EMSCRIPTEN
+    numLogicalCPUs = emscripten_num_logical_cores();
+    numPhysicalCPUs = numLogicalCPUs;
+   #else
     numLogicalCPUs  = getCpuInfo ("processor").getIntValue() + 1;
 
     // Assume CPUs in all sockets have the same number of cores
     numPhysicalCPUs = getCpuInfo ("cpu cores").getIntValue() * (getCpuInfo ("physical id").getIntValue() + 1);
+   #endif
 
     if (numPhysicalCPUs <= 0)
         numPhysicalCPUs = numLogicalCPUs;

@@ -224,11 +224,7 @@
  #if JUCE_BSD
   #include "native/juce_intel_SharedCode.h"
  #endif
- #if JUCE_EMSCRIPTEN
-  #include "native/juce_wasm_SystemStats.cpp"
- #else
-  #include "native/juce_linux_SystemStats.cpp"
- #endif
+ #include "native/juce_linux_SystemStats.cpp"
  #include "native/juce_linux_Threads.cpp"
 
 //==============================================================================

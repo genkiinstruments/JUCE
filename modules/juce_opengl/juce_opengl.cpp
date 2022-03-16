@@ -23,6 +23,10 @@
   ==============================================================================
 */
 
+#include <juce_core/system/juce_TargetPlatform.h>
+
+#if ! JUCE_EMSCRIPTEN
+
 #ifdef JUCE_OPENGL_H_INCLUDED
  /* When you add this cpp file to your project, you mustn't include it in a file where you've
     already included any other headers - just put it inside a file on its own, possibly with your config
@@ -284,3 +288,5 @@ JUCE_IMPL_WGL_EXTENSION_FUNCTION (wglCreateContextAttribsARB)
 
 #include "opengl/juce_OpenGLContext.cpp"
 #include "utils/juce_OpenGLAppComponent.cpp"
+
+#endif // JUCE_EMSCRIPTEN 

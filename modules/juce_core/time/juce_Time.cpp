@@ -93,7 +93,7 @@ namespace TimeHelpers
 
     static String formatString (const String& format, const std::tm* const tm)
     {
-       #if JUCE_ANDROID
+       #if JUCE_ANDROID || JUCE_EMSCRIPTEN
         using StringType = CharPointer_UTF8;
        #elif JUCE_WINDOWS
         using StringType = CharPointer_UTF16;
@@ -111,7 +111,7 @@ namespace TimeHelpers
             HeapBlock<StringType::CharType> buffer (bufferSize);
 
             auto numChars =
-                       #if JUCE_ANDROID
+                       #if JUCE_ANDROID || JUCE_EMSCRIPTEN
                         strftime (buffer, bufferSize - 1, format.toUTF8(), tm);
                        #elif JUCE_WINDOWS
                         wcsftime (buffer, bufferSize - 1, format.toWideCharPointer(), tm);

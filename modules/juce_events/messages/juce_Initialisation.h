@@ -132,13 +132,22 @@ public:
   #define JUCE_CREATE_APPLICATION_DEFINE(AppClass) \
     juce::JUCEApplicationBase* juce_CreateApplication(); \
     juce::JUCEApplicationBase* juce_CreateApplication() { return new AppClass(); }
-
-  #define JUCE_MAIN_FUNCTION_DEFINITION \
+  #if JUCE_EMSCRIPTEN
+   #define JUCE_MAIN_FUNCTION_DEFINITION \
+   extern void launchApp(int argc, char* argv[]); \
+   extern "C" int main(int argc, char* argv[]) \
+   { \
+      launchApp(argc, argv); \
+      return 0; \
+   }
+  #else
+   #define JUCE_MAIN_FUNCTION_DEFINITION \
     extern "C" JUCE_MAIN_FUNCTION \
     { \
        juce::JUCEApplicationBase::createInstance = &juce_CreateApplication; \
        return juce::JUCEApplicationBase::main (JUCE_MAIN_FUNCTION_ARGS); \
     }
+  #endif
 
  #endif
 

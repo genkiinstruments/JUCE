@@ -41,7 +41,7 @@ juce_add_gui_app(DemoRunner
                                     UIInterfaceOrientationLandscapeLeft
                                     UIInterfaceOrientationLandscapeRight)
 
-juce_generate_juce_header(DemoRunner)
+#juce_generate_juce_header(DemoRunner)
 
 target_sources(DemoRunner PRIVATE
     Source/Demos/DemoPIPs1.cpp
@@ -57,10 +57,19 @@ target_compile_definitions(DemoRunner PRIVATE
     JUCE_DEMO_RUNNER=1
     JUCE_STRICT_REFCOUNTEDPOINTER=1
     JUCE_UNIT_TESTS=1
-    JUCE_USE_CAMERA=1
-    JUCE_USE_CURL=1
-    JUCE_USE_MP3AUDIOFORMAT=1
-    JUCE_WEB_BROWSER=1)
+    JUCE_USE_MP3AUDIOFORMAT=1)
+
+if (EMSCRIPTEN)
+    target_compile_definitions(DemoRunner PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CAMERA=0)
+else ()
+    target_compile_definitions(DemoRunner PRIVATE
+        JUCE_USE_CURL=1
+        JUCE_WEB_BROWSER=1
+        JUCE_USE_CAMERA=1)
+endif ()
 
 target_link_libraries(DemoRunner PRIVATE
     juce::juce_analytics
@@ -70,10 +79,14 @@ target_link_libraries(DemoRunner PRIVATE
     juce::juce_opengl
     juce::juce_osc
     juce::juce_product_unlocking
-    juce::juce_video
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+    
+if (NOT EMSCRIPTEN)
+    target_link_libraries(DemoRunner PRIVATE
+        juce::juce_video)
+endif ()
 
 foreach(folder IN ITEMS ../Assets ../Audio ../DSP ../GUI ../Utilities)
     juce_add_bundle_resources_directory(DemoRunner ${folder})

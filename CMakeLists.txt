@@ -107,8 +107,17 @@ if(JUCE_BUILD_EXAMPLES)
         add_link_options(
 			    "--emrun" 
 			    "--enable-features=SharedArrayBuffer" 
-			    "-sEXPORTED_FUNCTIONS=['_main', '_juce_mouseCallback', '_juce_keyboardCallback', '_juce_animationFrameCallback']"
+			    "-sEXPORTED_FUNCTIONS=['_main', '_juce_mouseCallback', '_juce_keyboardCallback', '_juce_animationFrameCallback', '_emscripten_sync_run_in_main_runtime_thread_']"
                 "-sEXPORTED_RUNTIME_METHODS=['cwrap']"
+                "-sINITIAL_MEMORY=128MB"
+
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/wasm/fonts@/usr/X11R6/lib/X11/fonts"
+	            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Assets@/examples/Assets"
+	            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+	            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Audio@/Audio"
+	            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/DSP@/DSP"
+	            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+	            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Utilities@/Utilities"
                 )
     endif ()
     add_subdirectory(examples)
