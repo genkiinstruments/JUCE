@@ -488,17 +488,10 @@ function(juce_generate_juce_header target)
 
     set(extra_args)
 
-    if (EMSCRIPTEN)
-        add_custom_command(OUTPUT "${juce_header}" 
-            COMMAND ${CMAKE_COMMAND} -E copy "${JUCE_SOURCE_DIR}/extras/Build/CMake/DefaultJuceHeader.h" "${juce_header}"
-            DEPENDS "${defs_file}"
-            VERBATIM)
-    else ()
-        add_custom_command(OUTPUT "${juce_header}"
-            COMMAND juce::juceaide header "${defs_file}" "${juce_header}" ${extra_args}
-            DEPENDS "${defs_file}"
-            VERBATIM)
-    endif ()
+    add_custom_command(OUTPUT "${juce_header}"
+        COMMAND juce::juceaide header "${defs_file}" "${juce_header}" ${extra_args}
+        DEPENDS "${defs_file}"
+        VERBATIM)
 endfunction()
 
 # ==================================================================================================

@@ -80,6 +80,8 @@
             },
             "cacheVariables": {
                 "CMAKE_VERBOSE_MAKEFILE": true,
+                "EMSCRIPTEN_NATIVE_C_COMPILER": "gcc",
+                "EMSCRIPTEN_NATIVE_CXX_COMPILER": "g++",
                 "CMAKE_C_COMPILER": "$env{EMSCRIPTEN}/emcc",
                 "CMAKE_CXX_COMPILER": "$env{EMSCRIPTEN}/em++",
                 "CMAKE_AR": "$env{EMSCRIPTEN}/emar",

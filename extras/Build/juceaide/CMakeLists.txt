@@ -69,18 +69,29 @@ else()
 
     message(STATUS "Configuring juceaide")
 
+    if (EMSCRIPTEN)
+        if (NOT DEFINED EMSCRIPTEN_NATIVE_C_COMPILER OR NOT DEFINED EMSCRIPTEN_NATIVE_CXX_COMPILER)
+            message(FATAL_ERROR "juceaide cannot be build for Emscripten without specifying native C/C++ compilers. Executable is required.")
+        endif ()
+        set(JUCEAIDE_C_COMPILER ${EMSCRIPTEN_NATIVE_C_COMPILER})
+        set(JUCEAIDE_CXX_COMPILER ${EMSCRIPTEN_NATIVE_CXX_COMPILER})
+    else ()
+        set(JUCEAIDE_C_COMPILER ${CMAKE_C_COMPILER})
+        set(JUCEAIDE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+    endif ()
+
     # Looks like we're bootstrapping, reinvoke CMake
     execute_process(COMMAND "${CMAKE_COMMAND}"
             "."
             "-B${JUCE_BINARY_DIR}/tools"
             "-G${CMAKE_GENERATOR}"
             "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
-            "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
-            "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            "-DCMAKE_C_COMPILER=${JUCEAIDE_C_COMPILER}"
+            "-DCMAKE_CXX_COMPILER=${JUCEAIDE_CXX_COMPILER}"
             "-DCMAKE_BUILD_TYPE=Debug"
             "-DJUCE_BUILD_HELPER_TOOLS=ON"
             "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-            "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+            #"-DCMAKE_TOOLCHAIN_FILE=\"\""
             ${extra_configure_flags}
         WORKING_DIRECTORY "${JUCE_SOURCE_DIR}"
         OUTPUT_VARIABLE command_output

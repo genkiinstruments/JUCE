@@ -28,7 +28,7 @@ MessageManager::MessageManager() noexcept
 {
     if (JUCEApplicationBase::isStandaloneApp())
         Thread::setCurrentThreadName ("JUCE Message Thread");
-    DBG("messageThreadId " << (int)messageThreadId);
+    DBG("messageThreadId " << (intptr_t)messageThreadId);
 }
 
 MessageManager::~MessageManager() noexcept
