@@ -286,6 +286,8 @@ char OnlineUnlockStatus::MachineIDUtilities::getPlatformPrefix()
     return 'I';
    #elif JUCE_ANDROID
     return 'A';
+   #elif JUCE_EMSCRIPTEN
+    return 'E';
    #endif
 }
 
