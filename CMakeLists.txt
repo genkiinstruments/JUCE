@@ -108,8 +108,11 @@ if(JUCE_BUILD_EXAMPLES)
 			    "--emrun" 
 			    "--enable-features=SharedArrayBuffer" 
 			    "-sEXPORTED_FUNCTIONS=['_main', '_juce_mouseCallback', '_juce_keyboardCallback', '_juce_animationFrameCallback', '_emscripten_sync_run_in_main_runtime_thread_']"
-                "-sEXPORTED_RUNTIME_METHODS=['cwrap']"
+                "-sEXPORTED_RUNTIME_METHODS=['cwrap', 'ccall', 'printErr']"
                 "-sINITIAL_MEMORY=128MB"
+                "-sSAFE_HEAP=1"
+                "--profiling-funcs"
+                "--profiling"
 
                 "SHELL:--embed-file ${JUCE_SOURCE_DIR}/wasm/fonts@/usr/X11R6/lib/X11/fonts"
 	            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Assets@/examples/Assets"
