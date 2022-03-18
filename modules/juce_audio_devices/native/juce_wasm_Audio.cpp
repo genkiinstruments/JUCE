@@ -359,12 +359,12 @@ public:
     BigInteger getActiveOutputChannels () const override
     {
         BigInteger b;
-        b.setRange (0, numIn, true);
+        b.setRange (0, numOut, true);
         return b;
     }
     BigInteger getActiveInputChannels () const override {
         BigInteger b;
-        b.setRange (0, numOut, true);
+        b.setRange (0, numIn, true);
         return b;
     }
 
