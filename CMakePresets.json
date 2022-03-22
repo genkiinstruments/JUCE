@@ -70,22 +70,18 @@
                 "EMCC_DEBUG": "1",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "LLVM_ROOT": "/usr/bin/",
                 "EMSDK": "$env{HOME}/emsdk",
-                "EM_CONFIG": "$env{EMSDK}/.emscripten",
-                "EMSCRIPTEN": "$env{EMSDK}/upstream/emscripten",
                 "EMSDK_NODE_BIN": "$env{EMSDK}/node/14.18.2_64bit/bin",
-                "EMSDK_NODE": "$env{EMSDK_NODE_BIN}/node",
-                "PATH": "$env{EMSDK}:$env{EMSCRIPTEN}:$env{EMSDK_NODE_BIN}:$penv{PATH}"
+                "PATH": "$env{EMSDK}:$env{EMSDK}/upstream/emscripten:$env{EMSDK_NODE_BIN}:$penv{PATH}"
             },
             "cacheVariables": {
                 "CMAKE_VERBOSE_MAKEFILE": true,
                 "EMSCRIPTEN_NATIVE_C_COMPILER": "gcc",
                 "EMSCRIPTEN_NATIVE_CXX_COMPILER": "g++",
-                "CMAKE_C_COMPILER": "$env{EMSCRIPTEN}/emcc",
-                "CMAKE_CXX_COMPILER": "$env{EMSCRIPTEN}/em++",
-                "CMAKE_AR": "$env{EMSCRIPTEN}/emar",
-                "CMAKE_RANLIB": "$env{EMSCRIPTEN}/emranlib",
+                "CMAKE_C_COMPILER": "emcc",
+                "CMAKE_CXX_COMPILER": "em++",
+                "CMAKE_AR": "emar",
+                "CMAKE_RANLIB": "emranlib",
                 "EMSCRIPTEN_OUTPUT_HTML": true,
                 "EMSCRIPTEN_FORCE_PTHREADS": true,
                 "JUCE_BUILD_EXAMPLES": true
@@ -100,5 +96,12 @@
             }
         }
 
+    ],
+    "buildPresets": [
+        {
+            "name": "build-wasm-debug",
+            "displayName": "WASM Debug",
+            "configurePreset": "wasm-debug"
+        }
     ]
 }

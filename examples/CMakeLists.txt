@@ -23,6 +23,22 @@
 
 set(CMAKE_FOLDER examples)
 
+if (EMSCRIPTEN)
+    add_link_options(${EMSCRIPTEN_LINK_OPTIONS})
+    add_compile_options(${EMSCRIPTEN_COMPILE_OPTIONS})
+    add_link_options(
+            ${EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS}
+
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/wasm/fonts@/usr/X11R6/lib/X11/fonts"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Assets@/examples/Assets"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Audio@/Audio"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/DSP@/DSP"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Utilities@/Utilities"
+    )
+endif ()
+
 add_subdirectory(CMake)
 add_subdirectory(DemoRunner)
 

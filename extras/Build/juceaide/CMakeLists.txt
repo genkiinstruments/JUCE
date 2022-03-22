@@ -49,6 +49,24 @@ if(JUCE_BUILD_HELPER_TOOLS)
            NAMESPACE juce_tools::
            FILE "${JUCE_BINARY_DIR}/JUCEToolsExport.cmake")
 else()
+
+    # If cross-compiling to emscripten, we still want juceaide to be build as an executable for the
+    # current platform, so it can generate code during the build.
+    if (EMSCRIPTEN)
+        set(OLD_CMAKE_CROSSCOMPILING ${CMAKE_CROSSCOMPILING})
+        set(CMAKE_CROSSCOMPILING FALSE)
+
+        if (NOT DEFINED EMSCRIPTEN_NATIVE_C_COMPILER OR NOT DEFINED EMSCRIPTEN_NATIVE_CXX_COMPILER)
+            message(FATAL_ERROR "juceaide cannot be build for Emscripten without specifying native C/C++ compilers. Executable is required.")
+        endif ()
+        set(JUCEAIDE_C_COMPILER ${EMSCRIPTEN_NATIVE_C_COMPILER})
+        set(JUCEAIDE_CXX_COMPILER ${EMSCRIPTEN_NATIVE_CXX_COMPILER})
+    else ()
+        set(JUCEAIDE_C_COMPILER ${CMAKE_C_COMPILER})
+        set(JUCEAIDE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+    endif ()
+
+
     # If we're building using the NDK, the gradle wrapper will try to inject its own compiler using
     # environment variables, which is unfortunate because we really don't want to cross-compile
     # juceaide. If you really want to set the compilers for juceaide, pass the appropriate
@@ -68,18 +86,7 @@ else()
     endif()
 
     message(STATUS "Configuring juceaide")
-
-    if (EMSCRIPTEN)
-        if (NOT DEFINED EMSCRIPTEN_NATIVE_C_COMPILER OR NOT DEFINED EMSCRIPTEN_NATIVE_CXX_COMPILER)
-            message(FATAL_ERROR "juceaide cannot be build for Emscripten without specifying native C/C++ compilers. Executable is required.")
-        endif ()
-        set(JUCEAIDE_C_COMPILER ${EMSCRIPTEN_NATIVE_C_COMPILER})
-        set(JUCEAIDE_CXX_COMPILER ${EMSCRIPTEN_NATIVE_CXX_COMPILER})
-    else ()
-        set(JUCEAIDE_C_COMPILER ${CMAKE_C_COMPILER})
-        set(JUCEAIDE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-    endif ()
-
+    
     # Looks like we're bootstrapping, reinvoke CMake
     execute_process(COMMAND "${CMAKE_COMMAND}"
             "."
@@ -91,13 +98,12 @@ else()
             "-DCMAKE_BUILD_TYPE=Debug"
             "-DJUCE_BUILD_HELPER_TOOLS=ON"
             "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-            #"-DCMAKE_TOOLCHAIN_FILE=\"\""
             ${extra_configure_flags}
         WORKING_DIRECTORY "${JUCE_SOURCE_DIR}"
         OUTPUT_VARIABLE command_output
         ERROR_VARIABLE command_output
         RESULT_VARIABLE result_variable)
-
+        
     if(result_variable)
         message(FATAL_ERROR "Failed to configure juceaide\n${command_output}")
     endif()
@@ -133,4 +139,8 @@ else()
 
     get_filename_component(binary_name "${imported_location}" NAME)
     set(JUCE_JUCEAIDE_NAME "${binary_name}" CACHE INTERNAL "The name of the juceaide program")
+
+    if (DEFINED OLD_CMAKE_CROSSCOMPILING)
+        set(CMAKE_CROSSCOMPILING ${OLD_CMAKE_CROSSCOMPILING})
+    endif ()
 endif()
