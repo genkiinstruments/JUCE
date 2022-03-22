@@ -58,33 +58,17 @@
             }
         },
 
-
         {
             "name": "wasm-debug",
             "displayName": "WASM Debug",
-            "toolchainFile": "${sourceDir}/emscripten.cmake",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "installDir": "${sourceDir}/out/install/${presetName}",
             "generator": "Unix Makefiles",
-            "environment": {
-                "EMCC_DEBUG": "1",
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "EMSDK": "$env{HOME}/emsdk",
-                "EMSDK_NODE_BIN": "$env{EMSDK}/node/14.18.2_64bit/bin",
-                "PATH": "$env{EMSDK}:$env{EMSDK}/upstream/emscripten:$env{EMSDK_NODE_BIN}:$penv{PATH}"
-            },
+            "toolchainFile": "$env{HOME}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
-                "CMAKE_VERBOSE_MAKEFILE": true,
+                "JUCE_BUILD_EXAMPLES": true,
                 "EMSCRIPTEN_NATIVE_C_COMPILER": "gcc",
-                "EMSCRIPTEN_NATIVE_CXX_COMPILER": "g++",
-                "CMAKE_C_COMPILER": "emcc",
-                "CMAKE_CXX_COMPILER": "em++",
-                "CMAKE_AR": "emar",
-                "CMAKE_RANLIB": "emranlib",
-                "EMSCRIPTEN_OUTPUT_HTML": true,
-                "EMSCRIPTEN_FORCE_PTHREADS": true,
-                "JUCE_BUILD_EXAMPLES": true
+                "EMSCRIPTEN_NATIVE_CXX_COMPILER": "g++"
             },
             "vendor": {
                 "microsoft.com/VisualStudioSettings/CMake/1.0": {

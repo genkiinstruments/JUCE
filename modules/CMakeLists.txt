@@ -21,11 +21,6 @@
 #
 # ==============================================================================
 
-if (EMSCRIPTEN)
-    add_compile_options(${EMSCRIPTEN_COMPILE_OPTIONS})
-    add_link_options(${EMSCRIPTEN_LINK_OPTIONS})
-endif ()
-
 juce_add_modules(
     INSTALL_PATH "include/JUCE-${JUCE_VERSION}/modules"
     ALIAS_NAMESPACE juce

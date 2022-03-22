@@ -580,6 +580,11 @@ function(juce_add_module module_path)
 
     _juce_get_metadata("${metadata_dict}" searchpaths module_searchpaths)
 
+    if (EMSCRIPTEN)
+        target_compile_options(${module_name} INTERFACE ${EMSCRIPTEN_COMPILE_OPTIONS})
+        target_link_options(${module_name} INTERFACE ${EMSCRIPTEN_LINK_OPTIONS})
+    endif ()
+
     if(NOT module_searchpaths STREQUAL "")
         foreach(module_searchpath IN LISTS module_searchpaths)
             target_include_directories(${module_name}
