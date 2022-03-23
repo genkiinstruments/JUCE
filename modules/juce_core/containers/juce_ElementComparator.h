@@ -36,6 +36,10 @@ struct SortFunctionConverter
 {
     SortFunctionConverter (ElementComparator& e) : comparator (e) {}
 
+    SortFunctionConverter (const SortFunctionConverter&) = default;
+    SortFunctionConverter (SortFunctionConverter&&) = default;
+    SortFunctionConverter& operator= (SortFunctionConverter&&) = default;
+
     template <typename Type>
     bool operator() (Type a, Type b)  { return comparator.compareElements (a, b) < 0; }
 

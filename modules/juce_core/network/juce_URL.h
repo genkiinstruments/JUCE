@@ -55,6 +55,12 @@ public:
     /** Destructor. */
     ~URL() = default;
 
+    URL (const URL&) = default;
+    URL& operator= (const URL&) = default;
+
+    URL (URL&&) = default;
+    URL& operator= (URL&&) = default;
+
     /** Compares two URLs.
 
         All aspects of the URLs must be identical for them to match, including any parameters,

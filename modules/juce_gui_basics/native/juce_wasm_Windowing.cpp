@@ -22,6 +22,9 @@
   ==============================================================================
 */
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
+
 extern juce::JUCEApplicationBase* juce_CreateApplication(); // (from START_JUCE_APPLICATION)
 
 namespace juce {
@@ -237,7 +240,7 @@ EM_JS(void, attachEventCallbackToWindow, (),
             window.juce_clipboard = text;
         });
     });
-});
+})
 
 class EmscriptenComponentPeer : public ComponentPeer,
                                 public MessageListener
@@ -257,8 +260,8 @@ class EmscriptenComponentPeer : public ComponentPeer,
     struct RepaintMessage : public Message {};
 
     public:
-        EmscriptenComponentPeer(Component &component, int styleFlags)
-        :ComponentPeer(component, styleFlags)
+        EmscriptenComponentPeer(Component &component_, int styleFlags_)
+        :ComponentPeer(component_, styleFlags_)
         {
             emComponentPeerList.add(this);
             DBG("EmscriptenComponentPeer");
@@ -324,7 +327,7 @@ class EmscriptenComponentPeer : public ComponentPeer,
             //    handleFocusGain();
         }
 
-        ~EmscriptenComponentPeer()
+        ~EmscriptenComponentPeer() override
         {
             emComponentPeerList.removeAllInstancesOf(this);
             MAIN_THREAD_EM_ASM({
@@ -370,6 +373,7 @@ class EmscriptenComponentPeer : public ComponentPeer,
         virtual void setTitle (const String &title) override
         {
             DBG("setTitle: " << title);
+            juce::ignoreUnused(title);
         }
 
         virtual void setBounds (const Rectangle< int > &newBounds, bool isNowFullScreen) override
@@ -430,7 +434,7 @@ class EmscriptenComponentPeer : public ComponentPeer,
             return screenPosition - bounds.getPosition().toFloat();
         }
 
-        virtual void setMinimised (bool shouldBeMinimised) override
+        virtual void setMinimised (bool) override
         {
 
         }
@@ -441,7 +445,7 @@ class EmscriptenComponentPeer : public ComponentPeer,
         }
 
         bool fullscreen=false;
-        virtual void setFullScreen (bool shouldBeFullScreen) override
+        virtual void setFullScreen (bool /*shouldBeFullScreen*/) override
         {
             MAIN_THREAD_EM_ASM({
                 var canvas = document.getElementById(UTF8ToString($0));
@@ -465,12 +469,12 @@ class EmscriptenComponentPeer : public ComponentPeer,
             return fullscreen;
         }
 
-        virtual void setIcon (const Image &newIcon) override
+        virtual void setIcon (const Image &) override
         {
 
         }
 
-        virtual bool contains (Point< int > localPos, bool trueIfInAChildWindow) const override
+        virtual bool contains (Point< int > localPos, bool /*trueIfInAChildWindow*/) const override
         {
             Point<int> globalPos = localPos+bounds.getPosition();
             return bounds.contains(globalPos);
@@ -486,7 +490,7 @@ class EmscriptenComponentPeer : public ComponentPeer,
             return OptionalBorderSize();
         }
 
-        virtual bool setAlwaysOnTop (bool alwaysOnTop) override
+        virtual bool setAlwaysOnTop (bool) override
         {
             return false;
         }
@@ -613,6 +617,7 @@ class EmscriptenComponentPeer : public ComponentPeer,
         virtual void setAlpha (float newAlpha) override
         {
             DBG("setAlpha");
+            juce::ignoreUnused(newAlpha);
         }
 
         virtual StringArray getAvailableRenderingEngines() override
@@ -765,12 +770,12 @@ void MainThreadEventProxy::handleMouseEvent (const MouseEvent& e)
         if (e.wheelDelta == 0)
         {
             peer->handleMouseEvent(MouseInputSource::InputSourceType::mouse,
-                pos, mods, MouseInputSource::invalidPressure, 0.0f, fakeMouseEventTime);
+                pos, mods, MouseInputSource::defaultPressure, 0.0f, fakeMouseEventTime);
         } else
         {
             MouseWheelDetails wheelInfo;
             wheelInfo.deltaX = 0.0f;
-            wheelInfo.deltaY = e.wheelDelta / 480.0f;
+            wheelInfo.deltaY = static_cast<float>(e.wheelDelta) / 480.0f;
             wheelInfo.isReversed = false;
             wheelInfo.isSmooth = false;
             wheelInfo.isInertial = false;
@@ -942,7 +947,7 @@ JUCE_API void JUCE_CALLTYPE Process::makeForegroundProcess() {}
 JUCE_API void JUCE_CALLTYPE Process::hide() {}
 
 //==============================================================================
-void Desktop::setScreenSaverEnabled (const bool isEnabled)
+void Desktop::setScreenSaverEnabled (const bool)
 {
     // TODO
 }
@@ -953,9 +958,10 @@ bool Desktop::isScreenSaverEnabled()
 }
 
 //==============================================================================
-void Desktop::setKioskComponent (Component* kioskModeComponent, bool enableOrDisable, bool allowMenusAndBars)
+void Desktop::setKioskComponent (Component* kioskModeComponent_, bool enableOrDisable, bool allowMenusAndBars)
 {
     // TODO
+    juce::ignoreUnused(kioskModeComponent_, enableOrDisable, allowMenusAndBars);
 }
 
 //==============================================================================
@@ -970,12 +976,12 @@ void Displays::findDisplays (float masterScale)
     Display d;
     int width = MAIN_THREAD_EM_ASM_INT({
         return document.documentElement.clientWidth;
-    });
+    },);
     int height = MAIN_THREAD_EM_ASM_INT({
         return document.documentElement.scrollHeight;
-    });
+    },);
     
-    d.totalArea = (Rectangle<float>(width, height) / masterScale).toNearestIntEdges();
+    d.totalArea = (Rectangle<float>(static_cast<float>(width), static_cast<float>(height)) / masterScale).toNearestIntEdges();
     d.userArea = d.totalArea;
     d.isMain = true;
     d.scale = masterScale;
@@ -985,7 +991,7 @@ void Displays::findDisplays (float masterScale)
 }
 
 //==============================================================================
-Image juce_createIconForFile (const File& file)
+Image juce_createIconForFile (const File&)
 {
     return Image();
 }
@@ -1064,7 +1070,7 @@ EM_JS(const char*, emscriptenGetClipboard, (), {
     var dataOnWASMHeap = _malloc(dataLen);
     stringToUTF8(data, dataOnWASMHeap, dataLen);
     return dataOnWASMHeap;
-});
+})
 
 String SystemClipboard::getTextFromClipboard()
 {
@@ -1080,12 +1086,14 @@ void JUCE_CALLTYPE NativeMessageBox::showAsync(const MessageBoxOptions& options,
                                                ModalComponentManager::Callback* callback)
 {
     // TODO
+    juce::ignoreUnused(options, callback);
 }
 
 void JUCE_CALLTYPE NativeMessageBox::showAsync(const MessageBoxOptions& options,
                                                std::function<void(int)> callback)
 {
     // TODO
+    juce::ignoreUnused(options, callback);
 }
 
 // TODO: make async
@@ -1096,6 +1104,8 @@ void JUCE_CALLTYPE NativeMessageBox::showMessageBoxAsync (
     Component *associatedComponent,
     ModalComponentManager::Callback *callback)
 {
+  juce::ignoreUnused(iconType, title, associatedComponent);
+
     MAIN_THREAD_EM_ASM({
         alert( UTF8ToString($0) );
     }, message.toRawUTF8());
@@ -1110,25 +1120,29 @@ bool JUCE_CALLTYPE NativeMessageBox::showOkCancelBox(
     Component *associatedComponent,
     ModalComponentManager::Callback *callback)
 {
+  juce::ignoreUnused(iconType, title, associatedComponent);
+
     int result = MAIN_THREAD_EM_ASM_INT({
         return window.confirm( UTF8ToString($0) );
     }, message.toRawUTF8());
     if(callback != nullptr) callback->modalStateFinished(result?1:0);
 
-    return result?1:0;
+    return static_cast<bool>(result);
 }
 
 
 bool DragAndDropContainer::performExternalDragDropOfFiles (
     const StringArray& files, bool canMoveFiles, Component* sourceComp,
-    std::function<void()> callback)
+    std::function<void()> callback_)
 {
+    juce::ignoreUnused(files, canMoveFiles, sourceComp, callback_);
     return false;
 }
 
 bool DragAndDropContainer::performExternalDragDropOfText (
-    const String& text, Component* sourceComp, std::function<void()> callback)
+    const String& text, Component* sourceComp, std::function<void()> callback_)
 {
+  juce::ignoreUnused(text, sourceComp, callback_);
     return false;
 }
 
@@ -1209,3 +1223,5 @@ const int KeyPress::fastForwardKey  = extendedKeyModifier + 47;
 const int KeyPress::rewindKey       = extendedKeyModifier + 48;
 
 }
+
+#pragma clang diagnostic pop

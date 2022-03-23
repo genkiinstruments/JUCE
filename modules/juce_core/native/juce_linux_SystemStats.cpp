@@ -44,6 +44,7 @@ static String getCpuInfo (const char* key)
     return readPosixConfigFileValue ("/proc/cpuinfo", key);
 }
 
+#if ! JUCE_EMSCRIPTEN
 static String getLocaleValue (nl_item key)
 {
     auto oldLocale = ::setlocale (LC_ALL, "");
@@ -51,6 +52,7 @@ static String getLocaleValue (nl_item key)
     ::setlocale (LC_ALL, oldLocale);
     return result;
 }
+#endif
 #endif
 
 //==============================================================================
@@ -85,7 +87,7 @@ String SystemStats::getOperatingSystemName()
         var heapBytes = _malloc(lengthBytes);
         stringToUTF8(userAgent, heapBytes, lengthBytes);
         return heapBytes;
-    });
+    },);
     String ret(str);
     free((void*)str);
     return ret;
@@ -128,7 +130,7 @@ String SystemStats::getDeviceDescription()
         var heapBytes = _malloc(lengthBytes);
         stringToUTF8(platform, heapBytes, lengthBytes);
         return heapBytes;
-    });
+    },);
     String ret(str);
     free((void*)str);
     return ret;
@@ -146,7 +148,7 @@ String SystemStats::getDeviceManufacturer()
         var heapBytes = _malloc(lengthBytes);
         stringToUTF8(vendor, heapBytes, lengthBytes);
         return heapBytes;
-    });
+    },);
     String ret(str);
     free((void*)str);
     return ret;
@@ -223,7 +225,7 @@ int SystemStats::getMemorySizeInMegabytes()
             if (performance.memory != undefined)
                 return performance.memory.jsHeapSizeLimit / 1024 / 1024;
         return 128; // some arbitrary number just to get things working (hopefully)
-    });
+    },);
     return heapSizeLimit;
    #else
     struct sysinfo sysi;
@@ -276,7 +278,7 @@ String SystemStats::getDisplayLanguage()
         var heapBytes = _malloc(lengthBytes);
         stringToUTF8(language, heapBytes, lengthBytes);
         return heapBytes;
-    });
+    },);
     String ret(str);
     free((void*)str);
     return ret;

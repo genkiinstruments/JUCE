@@ -1025,6 +1025,9 @@ MemoryMappedFile::MemoryMappedFile (const File& file, MemoryMappedFile::AccessMo
     : range (0, file.getSize())
 {
     openInternal (file, mode, exclusive);
+#if JUCE_EMSCRIPTEN
+    juce::ignoreUnused(fileHandle);
+#endif
 }
 
 MemoryMappedFile::MemoryMappedFile (const File& file, const Range<int64>& fileRange, AccessMode mode, bool exclusive)

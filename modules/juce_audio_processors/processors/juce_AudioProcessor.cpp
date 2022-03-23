@@ -1243,6 +1243,7 @@ const char* AudioProcessor::getWrapperTypeDescription (AudioProcessor::WrapperTy
         case AudioProcessor::wrapperType_AAX:           return "AAX";
         case AudioProcessor::wrapperType_Standalone:    return "Standalone";
         case AudioProcessor::wrapperType_Unity:         return "Unity";
+        case AudioProcessor::wrapperType_WAM:           return "WAM";
         default:                                        jassertfalse; return {};
     }
 }

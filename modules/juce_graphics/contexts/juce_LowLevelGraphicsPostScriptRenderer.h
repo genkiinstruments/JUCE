@@ -93,7 +93,11 @@ protected:
     struct SavedState
     {
         SavedState();
+        SavedState (const SavedState&) = default;
         SavedState& operator= (const SavedState&) = delete;
+
+        SavedState (SavedState&&) = default;
+        SavedState& operator= (SavedState&&) = default;
 
         RectangleList<int> clip;
         int xOffset, yOffset;

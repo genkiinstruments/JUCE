@@ -60,7 +60,7 @@
 
         {
             "name": "wasm-debug",
-            "displayName": "WASM Debug",
+            "displayName": "Config: WASM Debug",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "installDir": "${sourceDir}/out/install/${presetName}",
             "generator": "Unix Makefiles",
@@ -78,6 +78,14 @@
                     "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}"
                 }
             }
+        },
+        {
+            "name": "wasm-release",
+            "displayName": "Config: WASM Release",
+            "inherits": "wasm-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
         }
 
     ],
@@ -86,6 +94,11 @@
             "name": "build-wasm-debug",
             "displayName": "WASM Debug",
             "configurePreset": "wasm-debug"
+        },
+        {
+            "name": "build-wasm-release",
+            "displayName": "WASM Release",
+            "configurePreset": "wasm-release"
         }
     ]
 }

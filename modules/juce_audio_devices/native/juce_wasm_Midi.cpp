@@ -53,7 +53,7 @@ void rtmidiCallback(double timeStamp, std::vector<unsigned char>* message, void*
     auto callback = ctx->callback;
     auto midiIn = ctx->midiIn;
     const void* data = message->data();
-    int numBytes = message->size();
+    int numBytes = static_cast<int>(message->size());
     // JUCE does not accept zero timestamp value, but RtMidi is supposed to send 0 for the first
     // message. To resolve that conflict, we offset 0.0 to slightly positive time.
     MidiMessage midiMessage{ data, numBytes, timeStamp > 0.0 ? timeStamp : 0.00000001 };
@@ -90,21 +90,21 @@ Array<MidiDeviceInfo> MidiInput::getAvailableDevices() {
     Array<MidiDeviceInfo> ret{};
     RtMidiIn rtmidi{};
 
-    for (int i = 0; i < rtmidi.getPortCount(); i++)
+    for (unsigned int i = 0; i < rtmidi.getPortCount(); i++)
         ret.add(MidiDeviceInfo(rtmidi.getPortName(i), String::formatted("MidiIn_%d", i)));
 
     return ret;
 }
 
 MidiDeviceInfo MidiInput::getDefaultDevice() {
-    return getAvailableDevices()[getDefaultDeviceIndex()];
+    return getAvailableDevices()[0];
 }
 
 std::unique_ptr<MidiInput> MidiInput::openDevice (const String& deviceIdentifier, MidiInputCallback* callback) {
     RtMidiIn rtmidiStatic{};
 
     std::unique_ptr<MidiInput> ret{nullptr};
-    for (int i = 0; i < rtmidiStatic.getPortCount(); i++)
+    for (unsigned int i = 0; i < rtmidiStatic.getPortCount(); i++)
         if (String::formatted("MidiIn_%d", i) == deviceIdentifier) {
             ret = std::unique_ptr<MidiInput>(new MidiInput(rtmidiStatic.getPortName(i), deviceIdentifier));
             ret->internal->callback = callback;
@@ -153,31 +153,31 @@ std::unique_ptr<MidiOutput> MidiOutput::createNewDevice(const String& deviceName
 MidiOutput::~MidiOutput() = default;
 
 void MidiOutput::sendMessageNow (const MidiMessage& message) {
-    internal->rtmidi->sendMessage(message.getRawData(), message.getRawDataSize());
+    internal->rtmidi->sendMessage(message.getRawData(), static_cast<size_t>(message.getRawDataSize()));
 }
 
 Array<MidiDeviceInfo> MidiOutput::getAvailableDevices() {
     Array<MidiDeviceInfo> ret{};
     RtMidiOut rtmidi{};
 
-    for (int i = 0; i < rtmidi.getPortCount(); i++)
+    for (unsigned int i = 0; i < rtmidi.getPortCount(); i++)
         ret.add(MidiDeviceInfo(rtmidi.getPortName(i), String::formatted("MidiOut_%d", i)));
 
     return ret;
 }
 
 MidiDeviceInfo MidiOutput::getDefaultDevice() {
-    return getAvailableDevices()[getDefaultDeviceIndex()];
+    return getAvailableDevices()[0];
 }
 
 std::unique_ptr<MidiOutput> MidiOutput::openDevice (const String& deviceIdentifier) {
     RtMidiOut rtmidi{};
     std::unique_ptr<MidiOutput> ret{nullptr};
-    for (int i = 0; i < rtmidi.getPortCount(); i++) {
+    for (unsigned int i = 0; i < rtmidi.getPortCount(); i++) {
         if (String::formatted("MidiOut_%d", i) == deviceIdentifier) {
             ret = std::unique_ptr<MidiOutput>(new MidiOutput(rtmidi.getPortName(i), deviceIdentifier));
-            auto& rtmidi = *ret->internal->rtmidi;
-            rtmidi.openPort(i);
+            auto& rtmidiOut = *ret->internal->rtmidi;
+            rtmidiOut.openPort(i);
             return ret;
         }
     }

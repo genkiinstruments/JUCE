@@ -35,6 +35,9 @@ public:
     {
     }
 
+    SVGState (const SVGState&) = default;
+    SVGState& operator= (const SVGState&) = delete;
+
     struct XmlPath
     {
         XmlPath (const XmlElement* e, const XmlPath* p) noexcept : xml (e), parent (p)  {}
@@ -1747,8 +1750,6 @@ private:
 
         deltaAngle = fmod (deltaAngle, MathConstants<double>::twoPi);
     }
-
-    SVGState& operator= (const SVGState&) = delete;
 };
 
 

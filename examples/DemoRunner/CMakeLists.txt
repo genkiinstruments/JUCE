@@ -64,6 +64,32 @@ if (EMSCRIPTEN)
         JUCE_USE_CURL=0
         JUCE_WEB_BROWSER=0
         JUCE_USE_CAMERA=0)
+
+    set(EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS
+            "--emrun"
+            "--enable-features=SharedArrayBuffer"
+            "-sEXPORTED_FUNCTIONS=['_main', '_juce_mouseCallback', '_juce_keyboardCallback', '_juce_animationFrameCallback', '_emscripten_sync_run_in_main_runtime_thread_']"
+            "-sEXPORTED_RUNTIME_METHODS=['cwrap', 'ccall', 'printErr']"
+            "-sINITIAL_MEMORY=128MB"
+            "-sSAFE_HEAP=1"
+            "--profiling-funcs"
+            "--profiling"
+            "-pthread"
+            )
+
+    target_compile_options(DemoRunner PUBLIC ${EMSCRIPTEN_COMPILE_OPTIONS})
+    target_link_options(DemoRunner PUBLIC
+            ${EMSCRIPTEN_LINK_OPTIONS}
+            ${EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS}
+
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/wasm/fonts@/usr/X11R6/lib/X11/fonts"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Assets@/examples/Assets"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Audio@/Audio"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/DSP@/DSP"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+            "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Utilities@/Utilities"
+            )
 else ()
     target_compile_definitions(DemoRunner PRIVATE
         JUCE_USE_CURL=1

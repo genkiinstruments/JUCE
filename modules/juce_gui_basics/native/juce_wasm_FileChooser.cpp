@@ -58,7 +58,10 @@ public:
 
 private:
     FileChooser& owner;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
     bool isDirectory, isSave, selectMultipleFiles, warnAboutOverwrite;
+#pragma clang diagnostic pop
 
     StringArray args;
     String separator;

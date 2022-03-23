@@ -33,7 +33,7 @@ int getAudioContextSampleRate() {
         var sr = ctx.sampleRate;
         ctx.close();
         return sr;
-    });
+    }, );
 }
 
 //==============================================================================
@@ -83,7 +83,7 @@ public:
         StateType state{StateWaitingForInteraction};
 
     public:
-        AudioFeedStateMachine (OpenALAudioIODevice* parent) : parent(parent) { }
+        AudioFeedStateMachine (OpenALAudioIODevice* parent_) : parent(parent_) { }
 
         ~AudioFeedStateMachine ()
         {
@@ -108,10 +108,10 @@ public:
 
         StateType getState () const { return state; }
 
-        void start (AudioIODeviceCallback* callback)
+        void start (AudioIODeviceCallback* callback_)
         {
-            this->callback = callback;
-            callback->audioDeviceAboutToStart (parent);
+            this->callback = callback_;
+            callback_->audioDeviceAboutToStart (parent);
 
             source = parent->source;
             for (int i = 0; i < numBuffers; i ++)
@@ -133,7 +133,7 @@ public:
                 }
                 int status = MAIN_THREAD_EM_ASM_INT ({
                     return window.juce_hadUserInteraction;
-                });
+                }, );
                 if (status)
                 {
                     state = StatePlaying;
@@ -146,11 +146,11 @@ public:
                         return StatusError;
                     }
 
-                    formatBuffer = new int16[bufferSize * numOut];
+                    formatBuffer = new int16[static_cast<unsigned long>(bufferSize * numOut)];
                     buffersIn  = new float*[16];
                     buffersOut = new float*[16];
                     for (int i = 0; i < numOut; i ++)
-                        buffersOut[i] = new float[bufferSize];
+                        buffersOut[i] = new float[static_cast<unsigned long>(bufferSize)];
                 }
             }
             if (state == StatePlaying)
@@ -192,13 +192,13 @@ public:
                         {
                             float x = std::min(buffersOut[c][i], 1.0f);
                             x = std::max(x, -1.0f);
-                            formatBuffer[c + i * numOut] = x * 32767;
+                            formatBuffer[c + i * numOut] = static_cast<int16>(juce::roundToInt(x * 32767.0f));
                         }
                     }
                     
                     alSourceUnqueueBuffers (source, 1, & buffer);
                     alBufferData (buffer, parent->format, formatBuffer,
-                        bufferSize * bytePerSampleOut, parent->frequency);
+                        bufferSize * bytePerSampleOut, static_cast<int>(parent->frequency));
                     alSourceQueueBuffers (source, 1, & buffer);
 
                     if ((parent->errorCode = alGetError()) != AL_NO_ERROR)
@@ -217,13 +217,13 @@ public:
         AudioFeedStateMachine stateMachine;
         OpenALAudioIODevice* parent;
 
-        AudioThread (OpenALAudioIODevice* parent)
-          : Thread("OpenAL Audio Thread"), stateMachine(parent)
+        AudioThread (OpenALAudioIODevice* parent_)
+          : Thread("OpenAL Audio Thread"), stateMachine(parent_)
         {
-            this->parent = parent;
+            this->parent = parent_;
         }
 
-        ~AudioThread () { }
+        ~AudioThread() override = default;
 
         void start (AudioIODeviceCallback* callback)
         {
@@ -250,13 +250,12 @@ public:
     };
 
 public:
-    OpenALAudioIODevice (bool threadBased = false)
-    : AudioIODevice ("OpenAL", "OpenAL"), threadBased(threadBased)
+    OpenALAudioIODevice (bool threadBased_ = false)
+    : AudioIODevice ("OpenAL", "OpenAL"), threadBased(threadBased_)
     {
-        DBG("OpenALAudioIODevice: constructor");
     }
 
-    ~OpenALAudioIODevice ()
+    ~OpenALAudioIODevice () override
     {
         DBG("OpenALAudioIODevice: destructor");
         if (isDeviceOpen)
@@ -289,13 +288,13 @@ public:
 
     String open (const BigInteger& inputChannels,
                  const BigInteger& outputChannels,
-                 double sampleRate,
+                 double sampleRate_,
                  int bufferSizeSamples) override
     {
         DBG("OpenALAudioIODevice: open");
         ScopedLock lock (sessionsLock);
         return openInternal (inputChannels, outputChannels,
-            sampleRate, bufferSizeSamples);
+            sampleRate_, bufferSizeSamples);
     }
     
     void close () override
@@ -390,17 +389,17 @@ private:
     bool isDeviceOpen{false};
     bool threadBased{false};
 
-    String openInternal (const BigInteger& inputChannels,
-                         const BigInteger& outputChannels,
-                         double sampleRate,
+    String openInternal (const BigInteger& /*inputChannels*/,
+                         const BigInteger& /*outputChannels*/,
+                         double sampleRate_,
                          int bufferSizeSamples)
     {
         closeInternal();
 
         this->bufferSize = bufferSizeSamples;
-        this->sampleRate = sampleRate;
+        this->sampleRate = sampleRate_;
 
-        ALenum errorCode = alGetError ();
+        ALenum errorCode_ = alGetError ();
         device = alcOpenDevice (nullptr);
         if (device == nullptr)
             return "Failed to open device.";
@@ -408,13 +407,13 @@ private:
 
         context = alcCreateContext (device, nullptr);
         alcMakeContextCurrent (context);
-        if (context == nullptr || (errorCode = alGetError()) != AL_NO_ERROR)
+        if (context == nullptr || (errorCode_ = alGetError()) != AL_NO_ERROR)
             return "Failed to create context.";
         DBG("OpenAL context is created.");
 
         alGenBuffers (numBuffers, buffers);
         alGenSources (1, & source);
-        if ((errorCode = alGetError()) != AL_NO_ERROR)
+        if ((errorCode_ = alGetError()) != AL_NO_ERROR)
             return "Failed to generate sources.";
         DBG("OpenAL sources and buffers are generated.");
 
@@ -503,7 +502,7 @@ struct OpenALAudioIODeviceType  : public AudioIODeviceType
                 window.addEventListener("mousedown",
                     window.juce_interactionListener);
             }
-        });
+        },);
         
         if (! openALMainThreadRegistered)
         {

@@ -22,6 +22,9 @@
 
 #if JUCE_EMSCRIPTEN
 #include <emscripten.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
 #endif
 
 #if JUCE_BSD
@@ -192,14 +195,16 @@ bool File::moveToTrash() const
 }
 
 //==============================================================================
-static bool isFileExecutable (const String& filename)
+#if !JUCE_EMSCRIPTEN
+static bool isFileExecutable(const String& filename)
 {
     juce_statStruct info;
 
-    return juce_stat (filename, info)
-            && S_ISREG (info.st_mode)
-            && access (filename.toUTF8(), X_OK) == 0;
+    return juce_stat(filename, info)
+        && S_ISREG(info.st_mode)
+        && access(filename.toUTF8(), X_OK) == 0;
 }
+#endif
 
 bool Process::openDocument (const String& fileName, const String& parameters)
 {
@@ -265,3 +270,7 @@ void File::revealToUser() const
 }
 
 } // namespace juce
+
+#if JUCE_EMSCRIPTEN
+#pragma clang diagnostic pop
+#endif

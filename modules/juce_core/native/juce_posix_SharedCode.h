@@ -378,6 +378,8 @@ bool File::setFileTimesInternal (int64 modificationTime, int64 accessTime, int64
         return utime (fullPath.toUTF8(), &times) == 0;
        #endif
     }
+   #else
+    juce::ignoreUnused(modificationTime, accessTime);
    #endif
 
     return false;
@@ -565,7 +567,9 @@ void MemoryMappedFile::openInternal (const File& file, AccessMode mode, bool exc
     }
 
 #if JUCE_EMSCRIPTEN
-    address = malloc(range.getLength());
+    juce::ignoreUnused(file, mode, exclusive);
+
+    address = malloc(static_cast<size_t>(range.getLength()));
     std::cerr << "MemoryMappedFile is not implemented for emscripten."
         << std::endl;
 #else
@@ -971,6 +975,9 @@ void JUCE_CALLTYPE Thread::setCurrentThreadName (const String& name)
     #else
      prctl (PR_SET_NAME, name.toRawUTF8(), 0, 0, 0);
     #endif
+   #elif JUCE_EMSCRIPTEN
+    // TODO
+    juce::ignoreUnused(name);
    #endif
 }
 
@@ -1085,6 +1092,7 @@ void* DynamicLibrary::getFunction (const String& functionName) noexcept
 static String readPosixConfigFileValue (const char* file, const char* key)
 {
 #if JUCE_EMSCRIPTEN
+    juce::ignoreUnused(file, key);
     return {};
 #else
     StringArray lines;
