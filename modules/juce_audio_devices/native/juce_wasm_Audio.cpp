@@ -20,8 +20,21 @@
   ==============================================================================
 */
 
+#include <thread>
+#include <iostream>
+
 namespace juce
 {
+
+#ifndef JUCE_EMSCRIPTEN_AUDIO_LOGGING
+ #define JUCE_EMSCRIPTEN_AUDIO_LOGGING 0
+#endif
+
+#if JUCE_EMSCRIPTEN_AUDIO_LOGGING
+ #define JUCE_EMSCRIPTEN_AUDIO_LOG(x)  std::cout << x << "\n"
+#else
+ #define JUCE_EMSCRIPTEN_AUDIO_LOG(x)
+#endif
 
 // Declarations from juce_emscripten_Messaging.
 extern void registerCallbackToMainThread (std::function<void()> f);
@@ -142,7 +155,7 @@ public:
                     alSourcePlay (source);
                     if ((parent->errorCode = alGetError()) != AL_NO_ERROR)
                     {
-                        DBG("OpenAL error occurred when starting to play.");
+                        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenAL error occurred when starting to play.");
                         return StatusError;
                     }
 
@@ -203,7 +216,7 @@ public:
 
                     if ((parent->errorCode = alGetError()) != AL_NO_ERROR)
                     {
-                        DBG("OpenAL error occurred when playing.");
+                        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenAL error occurred when playing: " << parent->getLastError());
                         return StatusError;
                     }
                 }
@@ -220,6 +233,7 @@ public:
         AudioThread (OpenALAudioIODevice* parent_)
           : Thread("OpenAL Audio Thread"), stateMachine(parent_)
         {
+            JUCE_EMSCRIPTEN_AUDIO_LOG("AudioThread constructor (TID = " << std::this_thread::get_id() << ")");
             this->parent = parent_;
         }
 
@@ -227,14 +241,14 @@ public:
 
         void start (AudioIODeviceCallback* callback)
         {
-            DBG("Starting OpenAL Audio Thread...");
+            JUCE_EMSCRIPTEN_AUDIO_LOG("Starting OpenAL Audio Thread...");
             stateMachine.start (callback);
             startThread (Thread::realtimeAudioPriority);
         }
 
         void stop ()
         {
-            DBG("Stopping OpenAL Audio Thread...");
+            JUCE_EMSCRIPTEN_AUDIO_LOG("Stopping OpenAL Audio Thread...");
             stopThread (500);
         }
 
@@ -253,11 +267,12 @@ public:
     OpenALAudioIODevice (bool threadBased_ = false)
     : AudioIODevice ("OpenAL", "OpenAL"), threadBased(threadBased_)
     {
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenALAudioIODevice: constructor (TID = " << std::this_thread::get_id() << ")");
     }
 
     ~OpenALAudioIODevice () override
     {
-        DBG("OpenALAudioIODevice: destructor");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenALAudioIODevice: destructor");
         if (isDeviceOpen)
             close();
     }
@@ -291,7 +306,7 @@ public:
                  double sampleRate_,
                  int bufferSizeSamples) override
     {
-        DBG("OpenALAudioIODevice: open");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenALAudioIODevice: open");
         ScopedLock lock (sessionsLock);
         return openInternal (inputChannels, outputChannels,
             sampleRate_, bufferSizeSamples);
@@ -299,7 +314,7 @@ public:
     
     void close () override
     {
-        DBG("OpenALAudioIODevice: close");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenALAudioIODevice: close");
         ScopedLock lock (sessionsLock);
         closeInternal();
     }
@@ -311,14 +326,14 @@ public:
 
     void start (AudioIODeviceCallback* newCallback) override
     {
-        DBG("OpenALAudioIODevice: start");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenALAudioIODevice: start");
         ScopedLock lock (sessionsLock);
         startInternal (newCallback);
     }
 
     void stop () override
     {
-        DBG("OpenALAudioIODevice: stop");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenALAudioIODevice: stop");
         ScopedLock lock (sessionsLock);
         if (isPlaying())
             stopInternal();
@@ -403,19 +418,19 @@ private:
         device = alcOpenDevice (nullptr);
         if (device == nullptr)
             return "Failed to open device.";
-        DBG("OpenAL device has opened.");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenAL device has opened.");
 
         context = alcCreateContext (device, nullptr);
         alcMakeContextCurrent (context);
         if (context == nullptr || (errorCode_ = alGetError()) != AL_NO_ERROR)
             return "Failed to create context.";
-        DBG("OpenAL context is created.");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenAL context is created.");
 
         alGenBuffers (numBuffers, buffers);
         alGenSources (1, & source);
         if ((errorCode_ = alGetError()) != AL_NO_ERROR)
             return "Failed to generate sources.";
-        DBG("OpenAL sources and buffers are generated.");
+        JUCE_EMSCRIPTEN_AUDIO_LOG("OpenAL sources and buffers are generated.");
 
         if (numOut == 1)
             format = AL_FORMAT_MONO16;
@@ -529,6 +544,7 @@ struct OpenALAudioIODeviceType  : public AudioIODeviceType
 
     AudioIODevice* createDevice (const String& outputName, const String& inputName) override
     {
+        JUCE_EMSCRIPTEN_AUDIO_LOG("AudioIODevice created on thread " << std::this_thread::get_id());
         if (outputName == "OpenAL" || inputName == "OpenAL")
             return new OpenALAudioIODevice();
 

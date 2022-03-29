@@ -26,6 +26,47 @@ set(CMAKE_FOLDER examples)
 add_subdirectory(CMake)
 add_subdirectory(DemoRunner)
 
+if (EMSCRIPTEN)
+    function (_juce_add_emscripten_executable target)
+        set(EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS
+                "--emrun"
+                "--enable-features=SharedArrayBuffer"
+                "-sEXPORTED_FUNCTIONS=['_main', '_juce_mouseCallback', '_juce_keyboardCallback', '_juce_animationFrameCallback', '_emscripten_sync_run_in_main_runtime_thread_']"
+                "-sEXPORTED_RUNTIME_METHODS=['cwrap', 'ccall', 'printErr']"
+                "-sINITIAL_MEMORY=128MB"
+                "--profiling-funcs"
+                "-pthread"
+                )
+
+        if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            list(APPEND EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS
+                    "-sSAFE_HEAP=1"
+                    "--profiling"
+                    )
+        endif ()
+
+        if (JUCE_EMSCRIPTEN_AUDIO_LOGGING)
+            target_compile_definitions(${target} PUBLIC 
+                    JUCE_EMSCRIPTEN_AUDIO_LOGGING=1
+                    )
+        endif ()
+
+        target_compile_options(${target} PUBLIC ${EMSCRIPTEN_COMPILE_OPTIONS})
+        target_link_options(${target} PUBLIC
+                ${EMSCRIPTEN_LINK_OPTIONS}
+                ${EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS}
+
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/wasm/fonts@/usr/X11R6/lib/X11/fonts"
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Assets@/examples/Assets"
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Audio@/Audio"
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/DSP@/DSP"
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
+                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Utilities@/Utilities"
+        )
+    endfunction ()
+endif ()
+
 function(_juce_add_pips)
     file(GLOB headers
         CONFIGURE_DEPENDS LIST_DIRECTORIES false
@@ -40,42 +81,18 @@ function(_juce_add_pips)
         list(REMOVE_ITEM headers
             "${CMAKE_CURRENT_SOURCE_DIR}/PushNotificationsDemo.h")
     endif()
-
+    
     foreach(header IN ITEMS ${headers})
         juce_add_pip(${header} added_target)
         target_link_libraries(${added_target} PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
+
+        if (EMSCRIPTEN)
+            _juce_add_emscripten_executable(${added_target})
+        endif ()
     endforeach()
-
-    if (EMSCRIPTEN)
-        set(EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS
-                "--emrun"
-                "--enable-features=SharedArrayBuffer"
-                "-sEXPORTED_FUNCTIONS=['_main', '_juce_mouseCallback', '_juce_keyboardCallback', '_juce_animationFrameCallback', '_emscripten_sync_run_in_main_runtime_thread_']"
-                "-sEXPORTED_RUNTIME_METHODS=['cwrap', 'ccall', 'printErr']"
-                "-sINITIAL_MEMORY=128MB"
-                "-sSAFE_HEAP=1"
-                "--profiling-funcs"
-                "--profiling"
-                "-pthread"
-                )
-
-        target_compile_options(${added_target} PUBLIC ${EMSCRIPTEN_COMPILE_OPTIONS})
-        target_link_options(${added_target} PUBLIC
-                ${EMSCRIPTEN_LINK_OPTIONS}
-                ${EMSCRIPTEN_EXECUTABLE_LINK_OPTIONS}
-
-                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/wasm/fonts@/usr/X11R6/lib/X11/fonts"
-                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Assets@/examples/Assets"
-                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
-                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Audio@/Audio"
-                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/DSP@/DSP"
-                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/GUI@/GUI"
-                "SHELL:--embed-file ${JUCE_SOURCE_DIR}/examples/Utilities@/Utilities"
-        )
-    endif ()
 endfunction()
 
 add_subdirectory(Audio)

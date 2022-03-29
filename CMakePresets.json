@@ -67,6 +67,7 @@
             "toolchainFile": "$env{HOME}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
                 "JUCE_BUILD_EXAMPLES": true,
+                "JUCE_EMSCRIPTEN_AUDIO_LOGGING": true,
                 "EMSCRIPTEN_NATIVE_C_COMPILER": "gcc",
                 "EMSCRIPTEN_NATIVE_CXX_COMPILER": "g++"
             },
