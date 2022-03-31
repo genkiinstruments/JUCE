@@ -54,7 +54,12 @@
 #pragma once
 #define JUCE_AUDIO_PROCESSORS_H_INCLUDED
 
-#include <juce_gui_basics/juce_gui_basics.h>
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include <juce_gui_basics/juce_gui_basics.h>
+#else
+ #include <juce_events/juce_events.h>
+ #include <juce_data_structures/juce_data_structures.h>
+#endif
 #include <juce_audio_basics/juce_audio_basics.h>
 
 //==============================================================================
@@ -126,31 +131,41 @@
 #include "utilities/juce_ExtensionsVisitor.h"
 #include "processors/juce_AudioProcessorParameter.h"
 #include "processors/juce_HostedAudioProcessorParameter.h"
-#include "processors/juce_AudioProcessorEditorHostContext.h"
-#include "processors/juce_AudioProcessorEditor.h"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "processors/juce_AudioProcessorEditorHostContext.h"
+ #include "processors/juce_AudioProcessorEditor.h"
+#endif
 #include "processors/juce_AudioProcessorListener.h"
 #include "processors/juce_AudioProcessorParameterGroup.h"
 #include "processors/juce_AudioProcessor.h"
 #include "processors/juce_PluginDescription.h"
 #include "processors/juce_AudioPluginInstance.h"
-#include "processors/juce_AudioProcessorGraph.h"
-#include "processors/juce_GenericAudioProcessorEditor.h"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "processors/juce_AudioProcessorGraph.h"
+ #include "processors/juce_GenericAudioProcessorEditor.h"
+#endif
 #include "format/juce_AudioPluginFormat.h"
 #include "format/juce_AudioPluginFormatManager.h"
-#include "scanning/juce_KnownPluginList.h"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "scanning/juce_KnownPluginList.h"
+#endif
 #include "format_types/juce_AudioUnitPluginFormat.h"
 #include "format_types/juce_LADSPAPluginFormat.h"
 #include "format_types/juce_VSTMidiEventList.h"
 #include "format_types/juce_VSTPluginFormat.h"
 #include "format_types/juce_VST3PluginFormat.h"
-#include "scanning/juce_PluginDirectoryScanner.h"
-#include "scanning/juce_PluginListComponent.h"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "scanning/juce_PluginDirectoryScanner.h"
+ #include "scanning/juce_PluginListComponent.h"
+#endif
 #include "utilities/juce_AudioProcessorParameterWithID.h"
 #include "utilities/juce_RangedAudioParameter.h"
 #include "utilities/juce_AudioParameterFloat.h"
 #include "utilities/juce_AudioParameterInt.h"
 #include "utilities/juce_AudioParameterBool.h"
 #include "utilities/juce_AudioParameterChoice.h"
-#include "utilities/juce_ParameterAttachments.h"
-#include "utilities/juce_AudioProcessorValueTreeState.h"
-#include "utilities/juce_PluginHostType.h"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "utilities/juce_ParameterAttachments.h"
+ #include "utilities/juce_AudioProcessorValueTreeState.h"
+ #include "utilities/juce_PluginHostType.h"
+#endif

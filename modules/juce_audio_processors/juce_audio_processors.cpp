@@ -39,17 +39,19 @@
 #define JUCE_GRAPHICS_INCLUDE_COREGRAPHICS_HELPERS 1
 
 #include "juce_audio_processors.h"
-#include <juce_gui_extra/juce_gui_extra.h>
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include <juce_gui_extra/juce_gui_extra.h>
+#endif
 
 //==============================================================================
 #if JUCE_MAC
- #if JUCE_SUPPORT_CARBON && (JUCE_PLUGINHOST_VST || JUCE_PLUGINHOST_AU)
+ #if JUCE_SUPPORT_CARBON && (JUCE_PLUGINHOST_VST || JUCE_PLUGINHOST_AU) && ! JUCE_AUDIOPROCESSORS_NO_GUI
   #include <Carbon/Carbon.h>
   #include <juce_gui_extra/native/juce_mac_CarbonViewWrapperComponent.h>
  #endif
 #endif
 
-#if (JUCE_PLUGINHOST_VST || JUCE_PLUGINHOST_VST3) && (JUCE_LINUX || JUCE_BSD)
+#if (JUCE_PLUGINHOST_VST || JUCE_PLUGINHOST_VST3) && (JUCE_LINUX || JUCE_BSD) && ! JUCE_AUDIOPROCESSORS_NO_GUI
  #include <X11/Xlib.h>
  #include <X11/Xutil.h>
  #include <sys/utsname.h>
@@ -83,7 +85,7 @@ static bool arrayContainsPlugin (const OwnedArray<PluginDescription>& list,
 
 #endif
 
-#if JUCE_MAC
+#if JUCE_MAC && ! JUCE_AUDIOPROCESSORS_NO_GUI
 
 //==============================================================================
 /*  This is an NSViewComponent which holds a long-lived NSView which acts
@@ -188,17 +190,21 @@ private:
 #include "format_types/juce_LegacyAudioParameter.cpp"
 #include "processors/juce_AudioProcessor.cpp"
 #include "processors/juce_AudioPluginInstance.cpp"
-#include "processors/juce_AudioProcessorEditor.cpp"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "processors/juce_AudioProcessorEditor.cpp"
+ #include "processors/juce_GenericAudioProcessorEditor.cpp"
 #include "processors/juce_AudioProcessorGraph.cpp"
-#include "processors/juce_GenericAudioProcessorEditor.cpp"
+#endif
 #include "processors/juce_PluginDescription.cpp"
 #include "format_types/juce_LADSPAPluginFormat.cpp"
 #include "format_types/juce_VSTPluginFormat.cpp"
 #include "format_types/juce_VST3PluginFormat.cpp"
 #include "format_types/juce_AudioUnitPluginFormat.mm"
-#include "scanning/juce_KnownPluginList.cpp"
-#include "scanning/juce_PluginDirectoryScanner.cpp"
-#include "scanning/juce_PluginListComponent.cpp"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "scanning/juce_KnownPluginList.cpp"
+ #include "scanning/juce_PluginDirectoryScanner.cpp"
+ #include "scanning/juce_PluginListComponent.cpp"
+#endif
 #include "processors/juce_AudioProcessorParameterGroup.cpp"
 #include "utilities/juce_AudioProcessorParameterWithID.cpp"
 #include "utilities/juce_RangedAudioParameter.cpp"
@@ -206,6 +212,8 @@ private:
 #include "utilities/juce_AudioParameterInt.cpp"
 #include "utilities/juce_AudioParameterBool.cpp"
 #include "utilities/juce_AudioParameterChoice.cpp"
-#include "utilities/juce_ParameterAttachments.cpp"
-#include "utilities/juce_AudioProcessorValueTreeState.cpp"
-#include "utilities/juce_PluginHostType.cpp"
+#if ! JUCE_AUDIOPROCESSORS_NO_GUI
+ #include "utilities/juce_ParameterAttachments.cpp"
+ #include "utilities/juce_AudioProcessorValueTreeState.cpp"
+ #include "utilities/juce_PluginHostType.cpp"
+#endif

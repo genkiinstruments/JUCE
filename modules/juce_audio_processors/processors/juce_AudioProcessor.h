@@ -956,6 +956,7 @@ public:
 
         @see hasEditor
     */
+   #if ! JUCE_AUDIOPROCESSORS_NO_GUI
     virtual AudioProcessorEditor* createEditor() = 0;
 
     /** Your processor subclass must override this and return true if it can create an
@@ -977,6 +978,7 @@ public:
         This may call createEditor() internally to create the component.
     */
     AudioProcessorEditor* createEditorIfNeeded();
+   #endif
 
     //==============================================================================
     /** Returns the default number of steps for a parameter.
@@ -1190,7 +1192,9 @@ public:
 
     //==============================================================================
     /** Not for public use - this is called before deleting an editor component. */
+   #if ! JUCE_AUDIOPROCESSORS_NO_GUI
     void editorBeingDeleted (AudioProcessorEditor*) noexcept;
+   #endif
 
     /** Flags to indicate the type of plugin context in which a processor is being used. */
     enum WrapperType
@@ -1218,6 +1222,7 @@ public:
 
     /** A struct containing information about the DAW track inside which your
         AudioProcessor is loaded. */
+   #if ! JUCE_AUDIOPROCESSORS_NO_GUI
     struct TrackProperties
     {
         String name;    // The name of the track - this will be empty if the track name is not known
@@ -1241,6 +1246,7 @@ public:
         The default implementation of this callback will do nothing.
     */
     virtual void updateTrackProperties (const TrackProperties& properties);
+   #endif
 
     //==============================================================================
     /** Helper function that just converts an xml element into a binary blob.
@@ -1464,7 +1470,9 @@ private:
 
     //==============================================================================
     Array<AudioProcessorListener*> listeners;
+   #if ! JUCE_AUDIOPROCESSORS_NO_GUI
     Component::SafePointer<AudioProcessorEditor> activeEditor;
+   #endif
     double currentSampleRate = 0;
     int blockSize = 0, latencySamples = 0;
     bool suspended = false;

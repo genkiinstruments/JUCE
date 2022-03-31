@@ -576,6 +576,13 @@ function(juce_add_module module_path)
     endif()
 
     _juce_get_metadata("${metadata_dict}" dependencies module_dependencies)
+
+    if(${module_name} STREQUAL "juce_audio_processors" AND JUCE_AUDIOPROCESSORS_NO_GUI)
+        list(REMOVE_ITEM module_dependencies juce_gui_extra)
+        list(APPEND module_dependencies juce_events juce_data_structures)
+        target_compile_definitions(${module_name} INTERFACE JUCE_AUDIOPROCESSORS_NO_GUI=1)
+    endif()
+
     target_link_libraries(${module_name} INTERFACE ${module_dependencies})
 
     _juce_get_metadata("${metadata_dict}" searchpaths module_searchpaths)
