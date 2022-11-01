@@ -157,7 +157,7 @@ struct ButtonBasedStatusItem   : public StatusItemContainer
 
             auto now = Time::getCurrentTime();
             auto mouseSource = Desktop::getInstance().getMainMouseSource();
-            auto pressure = (float) e.pressure;
+            auto pressure = (float) event.pressure;
 
             if (isLeft || isRight)
             {

@@ -1089,7 +1089,7 @@ void* DynamicLibrary::getFunction (const String& functionName) noexcept
 }
 
 //==============================================================================
-static String readPosixConfigFileValue (const char* file, const char* key)
+inline String readPosixConfigFileValue (const char* file, const char* key)
 {
 #if JUCE_EMSCRIPTEN
     juce::ignoreUnused(file, key);
