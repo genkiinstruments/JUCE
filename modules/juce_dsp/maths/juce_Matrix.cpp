@@ -2,15 +2,15 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2020 - Raw Material Software Limited
+   Copyright (c) 2022 - Raw Material Software Limited
 
    JUCE is an open source library subject to commercial or open-source
    licensing.
 
-   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
-   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   End User License Agreement: www.juce.com/juce-6-licence
+   End User License Agreement: www.juce.com/juce-7-licence
    Privacy Policy: www.juce.com/juce-privacy-policy
 
    Or: You may also use this code under the terms of the GPL v3 (see
@@ -176,7 +176,7 @@ bool Matrix<ElementType>::solve (Matrix& b) const noexcept
         {
             auto denominator = A (0,0);
 
-            if (denominator == 0)
+            if (approximatelyEqual (denominator, (ElementType) 0))
                 return false;
 
             b (0, 0) /= denominator;
@@ -187,7 +187,7 @@ bool Matrix<ElementType>::solve (Matrix& b) const noexcept
         {
             auto denominator = A (0, 0) * A (1, 1) - A (0, 1) * A (1, 0);
 
-            if (denominator == 0)
+            if (approximatelyEqual (denominator, (ElementType) 0))
                 return false;
 
             auto factor = (1 / denominator);
@@ -204,7 +204,7 @@ bool Matrix<ElementType>::solve (Matrix& b) const noexcept
                              + A (0, 1) * (A (1, 2) * A (2, 0) - A (1, 0) * A (2, 2))
                              + A (0, 2) * (A (1, 0) * A (2, 1) - A (1, 1) * A (2, 0));
 
-            if (denominator == 0)
+            if (approximatelyEqual (denominator, (ElementType) 0))
                 return false;
 
             auto factor = 1 / denominator;
@@ -231,10 +231,10 @@ bool Matrix<ElementType>::solve (Matrix& b) const noexcept
 
             for (size_t j = 0; j < n; ++j)
             {
-                if (M (j, j) == 0)
+                if (approximatelyEqual (M (j, j), (ElementType) 0))
                 {
                     auto i = j;
-                    while (i < n && M (i, j) == 0)
+                    while (i < n && approximatelyEqual (M (i, j), (ElementType) 0))
                         ++i;
 
                     if (i == n)

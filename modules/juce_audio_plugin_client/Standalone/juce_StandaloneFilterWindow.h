@@ -2,15 +2,15 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2020 - Raw Material Software Limited
+   Copyright (c) 2022 - Raw Material Software Limited
 
    JUCE is an open source library subject to commercial or open-source
    licensing.
 
-   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
-   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   End User License Agreement: www.juce.com/juce-6-licence
+   End User License Agreement: www.juce.com/juce-7-licence
    Privacy Policy: www.juce.com/juce-privacy-policy
 
    Or: You may also use this code under the terms of the GPL v3 (see
@@ -26,7 +26,7 @@
 #pragma once
 
 #ifndef DOXYGEN
- #include "../utility/juce_CreatePluginFilter.h"
+ #include <juce_audio_plugin_client/detail/juce_CreatePluginFilter.h>
 #endif
 
 namespace juce
@@ -124,7 +124,7 @@ public:
     //==============================================================================
     virtual void createPlugin()
     {
-        processor.reset (createPluginFilterOfType (AudioProcessor::wrapperType_Standalone));
+        processor = createPluginFilterOfType (AudioProcessor::wrapperType_Standalone);
         processor->disableNonMainBuses();
         processor->setRateAndBufferSizeDetails (44100, 512);
 
@@ -209,9 +209,12 @@ public:
             processor->getStateInformation (data);
 
             if (! fc.getResult().replaceWithData (data.getData(), data.getSize()))
-                AlertWindow::showMessageBoxAsync (AlertWindow::WarningIcon,
-                                                  TRANS("Error whilst saving"),
-                                                  TRANS("Couldn't write to the specified file!"));
+            {
+                auto opts = MessageBoxOptions::makeOptionsOk (AlertWindow::WarningIcon,
+                                                              TRANS ("Error whilst saving"),
+                                                              TRANS ("Couldn't write to the specified file!"));
+                messageBox = AlertWindow::showScopedAsync (opts, nullptr);
+            }
         });
     }
 
@@ -234,11 +237,16 @@ public:
             MemoryBlock data;
 
             if (fc.getResult().loadFileAsData (data))
+            {
                 processor->setStateInformation (data.getData(), (int) data.getSize());
+            }
             else
-                AlertWindow::showMessageBoxAsync (AlertWindow::WarningIcon,
-                                                  TRANS("Error whilst loading"),
-                                                  TRANS("Couldn't read from the specified file!"));
+            {
+                auto opts = MessageBoxOptions::makeOptionsOk (AlertWindow::WarningIcon,
+                                                              TRANS ("Error whilst loading"),
+                                                              TRANS ("Couldn't read from the specified file!"));
+                messageBox = AlertWindow::showScopedAsync (opts, nullptr);
+            }
         });
     }
 
@@ -386,13 +394,12 @@ public:
         return false;
     }
 
-    Image getIAAHostIcon (int size)
+    Image getIAAHostIcon ([[maybe_unused]] int size)
     {
        #if JUCE_IOS && JucePlugin_Enable_IAA
         if (auto device = dynamic_cast<iOSAudioIODevice*> (deviceManager.getCurrentAudioDevice()))
             return device->getIcon (size);
        #else
-        ignoreUnused (size);
        #endif
 
         return {};
@@ -418,6 +425,7 @@ public:
     Array<MidiDeviceInfo> lastMidiDevices;
 
     std::unique_ptr<FileChooser> stateFileChooser;
+    ScopedMessageBox messageBox;
 
 private:
     /*  This class can be used to ensure that audio callbacks use buffers with a
@@ -425,7 +433,7 @@ private:
 
         On some platforms (such as iOS 10), the expected buffer size reported in
         audioDeviceAboutToStart may be smaller than the blocks passed to
-        audioDeviceIOCallback. This can lead to out-of-bounds reads if the render
+        audioDeviceIOCallbackWithContext. This can lead to out-of-bounds reads if the render
         callback depends on additional buffers which were initialised using the
         smaller size.
 
@@ -448,11 +456,12 @@ private:
             inner.audioDeviceAboutToStart (device);
         }
 
-        void audioDeviceIOCallback (const float** inputChannelData,
-                                    int numInputChannels,
-                                    float** outputChannelData,
-                                    int numOutputChannels,
-                                    int numSamples) override
+        void audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
+                                               int numInputChannels,
+                                               float* const* outputChannelData,
+                                               int numOutputChannels,
+                                               int numSamples,
+                                               const AudioIODeviceCallbackContext& context) override
         {
             jassertquiet ((int) storedInputChannels.size()  == numInputChannels);
             jassertquiet ((int) storedOutputChannels.size() == numOutputChannels);
@@ -466,11 +475,12 @@ private:
                 initChannelPointers (inputChannelData,  storedInputChannels,  position);
                 initChannelPointers (outputChannelData, storedOutputChannels, position);
 
-                inner.audioDeviceIOCallback (storedInputChannels.data(),
-                                             (int) storedInputChannels.size(),
-                                             storedOutputChannels.data(),
-                                             (int) storedOutputChannels.size(),
-                                             blockLength);
+                inner.audioDeviceIOCallbackWithContext (storedInputChannels.data(),
+                                                        (int) storedInputChannels.size(),
+                                                        storedOutputChannels.data(),
+                                                        (int) storedOutputChannels.size(),
+                                                        blockLength,
+                                                        context);
 
                 position += blockLength;
             }
@@ -598,11 +608,12 @@ private:
     };
 
     //==============================================================================
-    void audioDeviceIOCallback (const float** inputChannelData,
-                                int numInputChannels,
-                                float** outputChannelData,
-                                int numOutputChannels,
-                                int numSamples) override
+    void audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
+                                           int numInputChannels,
+                                           float* const* outputChannelData,
+                                           int numOutputChannels,
+                                           int numSamples,
+                                           const AudioIODeviceCallbackContext& context) override
     {
         if (muteInput)
         {
@@ -610,8 +621,12 @@ private:
             inputChannelData = emptyBuffer.getArrayOfReadPointers();
         }
 
-        player.audioDeviceIOCallback (inputChannelData, numInputChannels,
-                                      outputChannelData, numOutputChannels, numSamples);
+        player.audioDeviceIOCallbackWithContext (inputChannelData,
+                                                 numInputChannels,
+                                                 outputChannelData,
+                                                 numOutputChannels,
+                                                 numSamples,
+                                                 context);
     }
 
     void audioDeviceAboutToStart (AudioIODevice* device) override
@@ -940,11 +955,17 @@ private:
 
         BorderSize<int> computeBorder() const
         {
-            const auto outer = owner.getContentComponentBorder();
-            return { outer.getTop() + (shouldShowNotification ? NotificationArea::height : 0),
-                     outer.getLeft(),
-                     outer.getBottom(),
-                     outer.getRight() };
+            const auto nativeFrame = [&]() -> BorderSize<int>
+            {
+                if (auto* peer = owner.getPeer())
+                    if (const auto frameSize = peer->getFrameSizeIfPresent())
+                        return *frameSize;
+
+                return {};
+            }();
+
+            return nativeFrame.addedTo (owner.getContentComponentBorder())
+                              .addedTo (BorderSize<int> { shouldShowNotification ? NotificationArea::height : 0, 0, 0, 0 });
         }
 
     private:
@@ -1068,57 +1089,17 @@ private:
         accordingly. The end result is that the peer is resized twice in a row to different sizes,
         which can appear glitchy/flickery to the user.
     */
-    struct DecoratorConstrainer : public ComponentBoundsConstrainer
+    class DecoratorConstrainer : public BorderedComponentBoundsConstrainer
     {
-        void checkBounds (Rectangle<int>& bounds,
-                          const Rectangle<int>& previousBounds,
-                          const Rectangle<int>& limits,
-                          bool isStretchingTop,
-                          bool isStretchingLeft,
-                          bool isStretchingBottom,
-                          bool isStretchingRight) override
+    public:
+        ComponentBoundsConstrainer* getWrappedConstrainer() const override
         {
-            auto* decorated = contentComponent != nullptr ? contentComponent->getEditorConstrainer()
-                                                          : nullptr;
+            return contentComponent != nullptr ? contentComponent->getEditorConstrainer() : nullptr;
+        }
 
-            if (decorated != nullptr)
-            {
-                const auto border = contentComponent->computeBorder();
-                const auto requestedBounds = bounds;
-
-                border.subtractFrom (bounds);
-                decorated->checkBounds (bounds,
-                                        border.subtractedFrom (previousBounds),
-                                        limits,
-                                        isStretchingTop,
-                                        isStretchingLeft,
-                                        isStretchingBottom,
-                                        isStretchingRight);
-                border.addTo (bounds);
-                bounds = bounds.withPosition (requestedBounds.getPosition());
-
-                if (isStretchingTop && ! isStretchingBottom)
-                    bounds = bounds.withBottomY (previousBounds.getBottom());
-
-                if (! isStretchingTop && isStretchingBottom)
-                    bounds = bounds.withY (previousBounds.getY());
-
-                if (isStretchingLeft && ! isStretchingRight)
-                    bounds = bounds.withRightX (previousBounds.getRight());
-
-                if (! isStretchingLeft && isStretchingRight)
-                    bounds = bounds.withX (previousBounds.getX());
-            }
-            else
-            {
-                ComponentBoundsConstrainer::checkBounds (bounds,
-                                                         previousBounds,
-                                                         limits,
-                                                         isStretchingTop,
-                                                         isStretchingLeft,
-                                                         isStretchingBottom,
-                                                         isStretchingRight);
-            }
+        BorderSize<int> getAdditionalBorder() const override
+        {
+            return contentComponent != nullptr ? contentComponent->computeBorder() : BorderSize<int>{};
         }
 
         void setMainContentComponent (MainContentComponent* in) { contentComponent = in; }

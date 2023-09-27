@@ -2,15 +2,15 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2020 - Raw Material Software Limited
+   Copyright (c) 2022 - Raw Material Software Limited
 
    JUCE is an open source library subject to commercial or open-source
    licensing.
 
-   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
-   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   End User License Agreement: www.juce.com/juce-6-licence
+   End User License Agreement: www.juce.com/juce-7-licence
    Privacy Policy: www.juce.com/juce-privacy-policy
 
    Or: You may also use this code under the terms of the GPL v3 (see
@@ -401,9 +401,11 @@ public:
         }
 
         if (error.isNotEmpty())
-            AlertWindow::showMessageBoxAsync (MessageBoxIconType::WarningIcon,
-                                              TRANS("Error when trying to open audio device!"),
-                                              error);
+            messageBox = AlertWindow::showScopedAsync (MessageBoxOptions().withIconType (MessageBoxIconType::WarningIcon)
+                                                                          .withTitle (TRANS ("Error when trying to open audio device!"))
+                                                                          .withMessage (error)
+                                                                          .withButton (TRANS ("OK")),
+                                                       nullptr);
     }
 
     bool showDeviceControlPanel()
@@ -720,7 +722,7 @@ private:
 
         auto currentRate = currentDevice->getCurrentSampleRate();
 
-        if (currentRate == 0)
+        if (exactlyEqual (currentRate, 0.0))
             currentRate = 48000.0;
 
         for (auto bs : currentDevice->getAvailableBufferSizes())
@@ -966,6 +968,7 @@ public:
 
 private:
     std::unique_ptr<ChannelSelectorListBox> inputChanList, outputChanList;
+    ScopedMessageBox messageBox;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioDeviceSettingsPanel)
 };
@@ -1051,7 +1054,6 @@ AudioDeviceSelectorComponent::AudioDeviceSelectorComponent (AudioDeviceManager& 
 
     deviceManager.addChangeListener (this);
     updateAllControls();
-    startTimer (1000);
 }
 
 AudioDeviceSelectorComponent::~AudioDeviceSelectorComponent()
@@ -1103,16 +1105,6 @@ void AudioDeviceSelectorComponent::resized()
 
     r.removeFromTop (itemHeight);
     setSize (getWidth(), r.getY());
-}
-
-void AudioDeviceSelectorComponent::timerCallback()
-{
-    // TODO
-    // unfortunately, the AudioDeviceManager only gives us changeListenerCallbacks
-    // if an audio device has changed, but not if a MIDI device has changed.
-    // This needs to be implemented properly. Until then, we use a workaround
-    // where we update the whole component once per second on a timer callback.
-    updateAllControls();
 }
 
 void AudioDeviceSelectorComponent::updateDeviceType()
@@ -1204,11 +1196,18 @@ void AudioDeviceSelectorComponent::updateAllControls()
 
 void AudioDeviceSelectorComponent::handleBluetoothButton()
 {
-    if (! RuntimePermissions::isGranted (RuntimePermissions::bluetoothMidi))
-        RuntimePermissions::request (RuntimePermissions::bluetoothMidi, nullptr);
-
     if (RuntimePermissions::isGranted (RuntimePermissions::bluetoothMidi))
+    {
         BluetoothMidiDevicePairingDialogue::open();
+    }
+    else
+    {
+        RuntimePermissions::request (RuntimePermissions::bluetoothMidi, [] (auto)
+        {
+            if (RuntimePermissions::isGranted (RuntimePermissions::bluetoothMidi))
+                BluetoothMidiDevicePairingDialogue::open();
+        });
+    }
 }
 
 ListBox* AudioDeviceSelectorComponent::getMidiInputSelectorListBox() const noexcept

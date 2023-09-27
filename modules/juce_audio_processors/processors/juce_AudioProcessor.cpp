@@ -2,15 +2,15 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2020 - Raw Material Software Limited
+   Copyright (c) 2022 - Raw Material Software Limited
 
    JUCE is an open source library subject to commercial or open-source
    licensing.
 
-   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
-   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   End User License Agreement: www.juce.com/juce-6-licence
+   End User License Agreement: www.juce.com/juce-7-licence
    Privacy Policy: www.juce.com/juce-privacy-policy
 
    Or: You may also use this code under the terms of the GPL v3 (see
@@ -340,7 +340,7 @@ void AudioProcessor::removeListener (AudioProcessorListener* listenerToRemove)
 
 void AudioProcessor::setPlayConfigDetails (int newNumIns, int newNumOuts, double newSampleRate, int newBlockSize)
 {
-    bool success = true;
+    [[maybe_unused]] bool success = true;
 
     if (getTotalNumInputChannels() != newNumIns)
         success &= setChannelLayoutOfBus (true,  0, AudioChannelSet::canonicalChannelSet (newNumIns));
@@ -362,7 +362,6 @@ void AudioProcessor::setPlayConfigDetails (int newNumIns, int newNumOuts, double
     jassert (success && newNumIns == getTotalNumInputChannels() && newNumOuts == getTotalNumOutputChannels());
 
     setRateAndBufferSizeDetails (newSampleRate, newBlockSize);
-    ignoreUnused (success);
 }
 
 void AudioProcessor::setRateAndBufferSizeDetails (double newSampleRate, int newBlockSize) noexcept
@@ -427,22 +426,31 @@ void AudioProcessor::updateHostDisplay (const AudioProcessorListener::ChangeDeta
             l->audioProcessorChanged (this, details);
 }
 
-void AudioProcessor::checkForUnsafeParamID (AudioProcessorParameter* param)
+void AudioProcessor::validateParameter (AudioProcessorParameter* param)
 {
     checkForDuplicateParamID (param);
     checkForDuplicateTrimmedParamID (param);
+
+    /*  If you're building this plugin as an AudioUnit, and you intend to use the plugin in
+        Logic Pro or GarageBand, it's a good idea to set version hints on all of your parameters
+        so that you can add parameters safely in future versions of the plugin.
+        See the documentation for AudioProcessorParameter(int) for more information.
+    */
+   #if JucePlugin_Build_AU
+    static std::once_flag flag;
+    if (wrapperType != wrapperType_Undefined && param->getVersionHint() == 0)
+        std::call_once (flag, [] { jassertfalse; });
+   #endif
 }
 
-void AudioProcessor::checkForDuplicateTrimmedParamID (AudioProcessorParameter* param)
+void AudioProcessor::checkForDuplicateTrimmedParamID ([[maybe_unused]] AudioProcessorParameter* param)
 {
-    ignoreUnused (param);
-
    #if JUCE_DEBUG && ! JUCE_DISABLE_CAUTIOUS_PARAMETER_ID_CHECKING
-    if (auto* withID = dynamic_cast<AudioProcessorParameterWithID*> (param))
+    if (auto* withID = dynamic_cast<HostedAudioProcessorParameter*> (param))
     {
         constexpr auto maximumSafeAAXParameterIdLength = 31;
 
-        const auto paramID = withID->paramID;
+        const auto paramID = withID->getParameterID();
 
         // If you hit this assertion, a parameter name is too long to be supported
         // by the AAX plugin format.
@@ -467,14 +475,12 @@ void AudioProcessor::checkForDuplicateTrimmedParamID (AudioProcessorParameter* p
    #endif
 }
 
-void AudioProcessor::checkForDuplicateParamID (AudioProcessorParameter* param)
+void AudioProcessor::checkForDuplicateParamID ([[maybe_unused]] AudioProcessorParameter* param)
 {
-    ignoreUnused (param);
-
    #if JUCE_DEBUG
-    if (auto* withID = dynamic_cast<AudioProcessorParameterWithID*> (param))
+    if (auto* withID = dynamic_cast<HostedAudioProcessorParameter*> (param))
     {
-        auto insertResult = paramIDs.insert (withID->paramID);
+        auto insertResult = paramIDs.insert (withID->getParameterID());
 
         // If you hit this assertion then the parameter ID is not unique
         jassert (insertResult.second);
@@ -482,10 +488,8 @@ void AudioProcessor::checkForDuplicateParamID (AudioProcessorParameter* param)
    #endif
 }
 
-void AudioProcessor::checkForDuplicateGroupIDs (const AudioProcessorParameterGroup& newGroup)
+void AudioProcessor::checkForDuplicateGroupIDs ([[maybe_unused]] const AudioProcessorParameterGroup& newGroup)
 {
-    ignoreUnused (newGroup);
-
    #if JUCE_DEBUG
     auto groups = newGroup.getSubgroups (true);
     groups.add (&newGroup);
@@ -512,7 +516,7 @@ void AudioProcessor::addParameter (AudioProcessorParameter* param)
     param->parameterIndex = flatParameterList.size();
     flatParameterList.add (param);
 
-    checkForUnsafeParamID (param);
+    validateParameter (param);
 }
 
 void AudioProcessor::addParameterGroup (std::unique_ptr<AudioProcessorParameterGroup> group)
@@ -529,7 +533,7 @@ void AudioProcessor::addParameterGroup (std::unique_ptr<AudioProcessorParameterG
         p->processor = this;
         p->parameterIndex = i;
 
-        checkForUnsafeParamID (p);
+        validateParameter (p);
     }
 
     parameterTree.addChild (std::move (group));
@@ -553,7 +557,7 @@ void AudioProcessor::setParameterTree (AudioProcessorParameterGroup&& newTree)
         p->processor = this;
         p->parameterIndex = i;
 
-        checkForUnsafeParamID (p);
+        validateParameter (p);
     }
 }
 
@@ -589,10 +593,9 @@ void AudioProcessor::processBypassed (AudioBuffer<floatType>& buffer, MidiBuffer
 void AudioProcessor::processBlockBypassed (AudioBuffer<float>&  buffer, MidiBuffer& midi)    { processBypassed (buffer, midi); }
 void AudioProcessor::processBlockBypassed (AudioBuffer<double>& buffer, MidiBuffer& midi)    { processBypassed (buffer, midi); }
 
-void AudioProcessor::processBlock (AudioBuffer<double>& buffer, MidiBuffer& midiMessages)
+void AudioProcessor::processBlock ([[maybe_unused]] AudioBuffer<double>& buffer,
+                                   [[maybe_unused]] MidiBuffer& midiMessages)
 {
-    ignoreUnused (buffer, midiMessages);
-
     // If you hit this assertion then either the caller called the double
     // precision version of processBlock on a processor which does not support it
     // (i.e. supportsDoublePrecisionProcessing() returns false), or the implementation
@@ -1151,7 +1154,7 @@ void AudioProcessor::Bus::updateChannelCount() noexcept
 void AudioProcessor::BusesProperties::addBus (bool isInput, const String& name,
                                               const AudioChannelSet& dfltLayout, bool isActivatedByDefault)
 {
-    jassert (dfltLayout.size() != 0);
+    jassert (! dfltLayout.isDisabled());
 
     BusProperties props;
 
@@ -1181,55 +1184,6 @@ AudioProcessor::BusesProperties AudioProcessor::BusesProperties::withOutput (con
 }
 
 //==============================================================================
-int32 AudioProcessor::getAAXPluginIDForMainBusConfig (const AudioChannelSet& mainInputLayout,
-                                                      const AudioChannelSet& mainOutputLayout,
-                                                      const bool idForAudioSuite) const
-{
-    int uniqueFormatId = 0;
-
-    for (int dir = 0; dir < 2; ++dir)
-    {
-        const bool isInput = (dir == 0);
-        auto& set = (isInput ? mainInputLayout : mainOutputLayout);
-        int aaxFormatIndex = 0;
-
-        const AudioChannelSet sets[]
-        {
-            AudioChannelSet::disabled(),
-            AudioChannelSet::mono(),
-            AudioChannelSet::stereo(),
-            AudioChannelSet::createLCR(),
-            AudioChannelSet::createLCRS(),
-            AudioChannelSet::quadraphonic(),
-            AudioChannelSet::create5point0(),
-            AudioChannelSet::create5point1(),
-            AudioChannelSet::create6point0(),
-            AudioChannelSet::create6point1(),
-            AudioChannelSet::create7point0(),
-            AudioChannelSet::create7point1(),
-            AudioChannelSet::create7point0SDDS(),
-            AudioChannelSet::create7point1SDDS(),
-            AudioChannelSet::create7point0point2(),
-            AudioChannelSet::create7point1point2(),
-            AudioChannelSet::ambisonic (1),
-            AudioChannelSet::ambisonic (2),
-            AudioChannelSet::ambisonic (3)
-        };
-
-        const auto index = (int) std::distance (std::begin (sets), std::find (std::begin (sets), std::end (sets), set));
-
-        if (index != numElementsInArray (sets))
-            aaxFormatIndex = index;
-        else
-            jassertfalse;
-
-        uniqueFormatId = (uniqueFormatId << 8) | aaxFormatIndex;
-    }
-
-    return (idForAudioSuite ? 0x6a796161 /* 'jyaa' */ : 0x6a636161 /* 'jcaa' */) + uniqueFormatId;
-}
-
-//==============================================================================
 const char* AudioProcessor::getWrapperTypeDescription (AudioProcessor::WrapperType type) noexcept
 {
     switch (type)
@@ -1239,12 +1193,69 @@ const char* AudioProcessor::getWrapperTypeDescription (AudioProcessor::WrapperTy
         case AudioProcessor::wrapperType_VST3:          return "VST3";
         case AudioProcessor::wrapperType_AudioUnit:     return "AU";
         case AudioProcessor::wrapperType_AudioUnitv3:   return "AUv3";
-        case AudioProcessor::wrapperType_RTAS:          return "RTAS";
         case AudioProcessor::wrapperType_AAX:           return "AAX";
         case AudioProcessor::wrapperType_Standalone:    return "Standalone";
         case AudioProcessor::wrapperType_Unity:         return "Unity";
+        case AudioProcessor::wrapperType_LV2:           return "LV2";
         default:                                        jassertfalse; return {};
     }
+}
+
+//==============================================================================
+VST2ClientExtensions* AudioProcessor::getVST2ClientExtensions()
+{
+    if (auto* extensions = dynamic_cast<VST2ClientExtensions*> (this))
+    {
+        //  To silence this jassert there are two options:
+        //
+        //  1. - Override AudioProcessor::getVST2ClientExtensions() and
+        //       return the "this" pointer.
+        //
+        //     - This option has the advantage of being quick and easy,
+        //       and avoids the above dynamic_cast.
+        //
+        //  2. - Create a new object that inherits from VST2ClientExtensions.
+        //
+        //     - Port your existing functionality from the AudioProcessor
+        //       to the new object.
+        //
+        //     - Return a pointer to the object in AudioProcessor::getVST2ClientExtensions().
+        //
+        //     - This option has the advantage of allowing you to break
+        //       up your AudioProcessor into smaller composable objects.
+        jassertfalse;
+        return extensions;
+    }
+
+    return nullptr;
+}
+
+VST3ClientExtensions* AudioProcessor::getVST3ClientExtensions()
+{
+    if (auto* extensions = dynamic_cast<VST3ClientExtensions*> (this))
+    {
+        //  To silence this jassert there are two options:
+        //
+        //  1. - Override AudioProcessor::getVST3ClientExtensions() and
+        //       return the "this" pointer.
+        //
+        //     - This option has the advantage of being quick and easy,
+        //       and avoids the above dynamic_cast.
+        //
+        //  2. - Create a new object that inherits from VST3ClientExtensions.
+        //
+        //     - Port your existing functionality from the AudioProcessor
+        //       to the new object.
+        //
+        //     - Return a pointer to the object in AudioProcessor::getVST3ClientExtensions().
+        //
+        //     - This option has the advantage of allowing you to break
+        //       up your AudioProcessor into smaller composable objects.
+        jassertfalse;
+        return extensions;
+    }
+
+    return nullptr;
 }
 
 //==============================================================================
@@ -1411,8 +1422,8 @@ const String AudioProcessor::getParameterName (int index)
 String AudioProcessor::getParameterID (int index)
 {
     // Don't use getParamChecked here, as this must also work for legacy plug-ins
-    if (auto* p = dynamic_cast<AudioProcessorParameterWithID*> (getParameters()[index]))
-        return p->paramID;
+    if (auto* p = dynamic_cast<HostedAudioProcessorParameter*> (getParameters()[index]))
+        return p->getParameterID();
 
     return String (index);
 }
@@ -1484,6 +1495,9 @@ AudioProcessorParameter* AudioProcessor::getParamChecked (int index) const
     return p;
 }
 
+bool AudioProcessor::canAddBus ([[maybe_unused]] bool isInput) const                     { return false; }
+bool AudioProcessor::canRemoveBus ([[maybe_unused]] bool isInput) const                  { return false; }
+
 JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 JUCE_END_IGNORE_WARNINGS_MSVC
 
@@ -1492,8 +1506,6 @@ void AudioProcessorListener::audioProcessorParameterChangeGestureBegin (AudioPro
 void AudioProcessorListener::audioProcessorParameterChangeGestureEnd   (AudioProcessor*, int) {}
 
 //==============================================================================
-AudioProcessorParameter::AudioProcessorParameter() noexcept {}
-
 AudioProcessorParameter::~AudioProcessorParameter()
 {
    #if JUCE_DEBUG && ! JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING
