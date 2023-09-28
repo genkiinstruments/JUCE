@@ -157,7 +157,7 @@ struct API_AVAILABLE (macos (10.10)) ButtonBasedStatusItem : public StatusItemCo
 
             auto now = Time::getCurrentTime();
             auto mouseSource = Desktop::getInstance().getMainMouseSource();
-            auto pressure = (float) e.pressure;
+            auto pressure = (float) event.pressure;
 
             if (isLeft || isRight)
             {
